@@ -1,0 +1,7 @@
+bin
+compile_commands.json
+extension_api.json
+.sconsign.dblite
+.cache
+*.hevc
+*.os

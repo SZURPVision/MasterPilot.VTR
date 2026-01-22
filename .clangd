@@ -1,0 +1,18 @@
+CompileFlags:
+  CompilationDatabase: "."
+  
+  Add: [
+    "-std=c++20",
+    "-I./godot-cpp/include",
+    "-I./godot-cpp/gen/include",
+    "-I./godot-cpp/gdextension",
+    "-I./src",
+    "-DGDEXTENSION",
+    "-DLINUX_ENABLED",
+    "-DDEBUG_ENABLED"
+  ]
+  
+  Remove: [-fno-gnu-unique, -fstack-usage, -m*]
+
+Index:
+  Background: Build
