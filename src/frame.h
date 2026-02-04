@@ -10,9 +10,4 @@ struct UDPHeader {
     uint32_t total_size;
 };
 #pragma pack(pop)
-
-struct FrameBuffer {
-    uint32_t total_size{};
-    uint32_t current_received_byte{};
-    std::map<uint16_t, std::vector<uint8_t>> slices;
-};
+static_assert(sizeof(UDPHeader)==8, "UDPHeader Size Wrong.");

@@ -1,7 +1,7 @@
 #pragma once
 #include <condition_variable>
 #include <queue>
-#include <vector>
+#include <span>
 namespace VTR
 {
 template<typename T>
@@ -24,5 +24,5 @@ public:
         return true;
     }
 };
-using Que = SafeQueue<std::vector<uint8_t>>;
+using Que = SafeQueue<std::span<uint8_t>>;
 }

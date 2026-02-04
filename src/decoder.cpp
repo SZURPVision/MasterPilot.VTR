@@ -98,7 +98,7 @@ void Decoder::cleanup()
 
 void Decoder::decode_loop()
 {
-    std::vector<uint8_t> data;
+    std::span<uint8_t> data;
     while (running)
     {
         // Blocking pop from safe queue

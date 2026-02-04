@@ -5,3 +5,4 @@ extension_api.json
 .cache
 *.hevc
 *.os
+.godot_bin
