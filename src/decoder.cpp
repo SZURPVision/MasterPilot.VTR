@@ -1,4 +1,5 @@
 #include "decoder.h"
+#include "time_analyzer.hpp"
 #include <iostream>
 #include <cstring>
 
@@ -113,18 +114,14 @@ void Decoder::decode_loop()
         // Actually av_packet_from_data is unsafe if we don't own the buffer. 
         // Safer to copy or ensure lifetime. Here we copy into the packet struct ref.
         
-        // Reset packet
         av_packet_unref(pkt);
-        
-        // We must create a new reference or copy because 'data' vector will be destroyed next iteration
-        if (av_new_packet(pkt, data.size()) < 0) {
-             std::cerr << "[Decoder] Packet allocation failed" << std::endl;
-             continue;
-        }
-        memcpy(pkt->data, data.data(), data.size());
-
-        // Send packet to decoder
+		//使用span引用而不是拷贝. ReAssemblyPool保证了span可以活2秒以上
+		pkt->data = data.data();
+		pkt->size = data.size();
         int ret = avcodec_send_packet(codec_ctx, pkt);
+		//防止释放span
+		pkt->data = nullptr;
+		pkt->size = 0;
         if (ret < 0) {
             char errbuf[64];
             av_strerror(ret, errbuf, 64);
@@ -150,6 +147,7 @@ void Decoder::decode_loop()
 
 void Decoder::process_frame(AVFrame* src_frame)
 {
+	TimeAnalyzer timer{"Decoder::process_frame"};
     // Check if resolution changed or we need to init sws context
     if (src_frame->width != current_width || src_frame->height != current_height || !sws_ctx) {
         

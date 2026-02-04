@@ -1,4 +1,5 @@
 #include "vtr_texture.h"
+#include "time_analyzer.hpp"
 
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
@@ -96,6 +97,7 @@ void VTRTexture::_sync_state() {
 }
 
 void VTRTexture::_on_decoder_frame(const uint8_t* data, int p_width, int p_height) {
+	TimeAnalyzer timer{"VTRTexure::on_decoder_frame"};
     // [Decoder Thread]
     // We cannot touch RenderingServer or Ref<Image> safely here.
     // We copy the raw data into a Godot PackedByteArray.
@@ -112,6 +114,7 @@ void VTRTexture::_on_decoder_frame(const uint8_t* data, int p_width, int p_heigh
 }
 
 void VTRTexture::_update_texture_on_main_thread(const PackedByteArray& p_data, int p_width, int p_height) {
+	TimeAnalyzer timer{"VTRTexure::update_texture_on_main_thread"};
     // [Main Thread]
     
     // Create an image wrapper around the data (efficient, mostly metadata)

@@ -1,5 +1,6 @@
 #include "udp.h"
 #include "frame.h"
+#include "time_analyzer.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -54,6 +55,7 @@ void UDP::recv_loop()
     socklen_t len = sizeof(cliaddr);
     while(running)
     {
+		TimeAnalyzer timer{"UDP::recv_loop"};
         auto n = recvfrom(sockfd,
 			buffer,
 			sizeof(buffer),
@@ -68,6 +70,7 @@ void UDP::recv_loop()
 }
 void UDP::process_packet(uint8_t* raw_buf, ssize_t n)
 {
+	TimeAnalyzer timer{"UDP::process_packet"};
     auto header = reinterpret_cast<UDPHeader*>(raw_buf);
 	std::span<uint8_t> payload = {raw_buf + sizeof(UDPHeader),raw_buf+n};
 	auto ret = asm_pool.push_and_assemble(*header, payload);

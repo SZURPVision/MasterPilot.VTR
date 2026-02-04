@@ -37,17 +37,17 @@ class ReassemblyPool
 	}
 
 	private:
-	class FrameSlot 
+	class alignas(64) FrameSlot 
 	{
 		private:
+		uint32_t current_received_byte = 0;
+		uint32_t total_byte = 0;
 		int16_t serial = -1; //序列号, 用于判断是不是同一包
-		size_t current_received_byte = 0;
-		std::bitset<slice_pre_alloc_count> slice_exist;
-		std::vector<uint8_t> data;
+		uint16_t vote = 0;
+		uint32_t alter_total_byte = 0;
 
-		uint16_t vote;
-		size_t total_byte = 0;
-		size_t alter_total_byte = 0;
+		std::vector<uint8_t> data;
+		std::bitset<slice_pre_alloc_count> slice_exist;
 		private:
 		
 		public:
@@ -98,7 +98,6 @@ class ReassemblyPool
 		FrameSlot() : data(pre_alloc_size) {}
 	};
 	std::array<FrameSlot,buffer_frame_count> pool;
-	uint16_t last_frame_id = 0;
 };
 
 }
