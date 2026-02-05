@@ -4,7 +4,9 @@
 
 #include <cassert>
 #include <cstdint>
+#include <expected>
 #include <iostream>
+#include <ostream>
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
@@ -27,8 +29,10 @@ bool UDP::start(int port)
         .sin_addr {INADDR_ANY}, //所有网卡接口
     };
 
-    if(bind(sockfd, (const sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+	int n_ret = bind(sockfd, (const sockaddr *)&servaddr, sizeof(servaddr));
+    if(n_ret < 0)
     {
+		std::cerr<<"[UDP] Failed to bind, ret="<<n_ret<<std::endl;
         close(sockfd);
         return false;
     }

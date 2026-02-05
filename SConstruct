@@ -13,7 +13,7 @@ env: SConsEnvironment = SConscript("godot-cpp/SConstruct") # type: ignore
 # --- Configuration ---
 
 env.Append(CPPPATH=["src"])
-env.Append(CCFLAGS=["-std=c++20", "-fPIC"])
+env.Append(CCFLAGS=["-std=c++23", "-fPIC"])
 
 # --- Platform: Linux ---
 # Accessing dictionary keys on 'env' usually returns generic types, so we check carefully.
