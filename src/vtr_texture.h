@@ -59,6 +59,8 @@ private:
 
     // Internal method called via call_deferred on Main Thread
     void _update_texture_on_main_thread(const PackedByteArray& p_data, int p_width, int p_height);
+
+	void _ensure_rid();
 };
 
 } // namespace godot

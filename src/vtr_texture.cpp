@@ -9,14 +9,6 @@ using namespace godot;
 VTRTexture::VTRTexture() 
     : udp(queue), decoder(queue) // Initialize subsystems with the shared queue
 {
-    // 1. Create a valid (but empty) texture RID on the RenderingServer.
-    // This allows the texture to be assigned to meshes/UI immediately without crashing.
-    // We start with a 1x1 transparent pixel.
-    Ref<Image> placeholder = Image::create_empty(1, 1, false, Image::FORMAT_RGBA8);
-    texture_rid = RenderingServer::get_singleton()->texture_2d_create(placeholder);
-
-    // 2. Set up the decoder callback.
-    // This lambda is executed by the Decoder thread whenever a frame is ready.
     decoder.set_on_frame_decoded([this](const uint8_t* data, int w, int h) {
         this->_on_decoder_frame(data, w, h);
     });
@@ -32,23 +24,20 @@ VTRTexture::~VTRTexture() {
     }
 }
 
-int32_t VTRTexture::_get_width() const {
-    return width;
-}
-
-int32_t VTRTexture::_get_height() const {
-    return height;
-}
-
-bool VTRTexture::_has_alpha() const {
-    // HEVC is typically opaque, but we decode to RGBA, so we can support alpha if needed.
-    // Returning false is usually slightly more performant for rendering if alpha isn't used.
-    return false; 
-}
+int32_t VTRTexture::_get_width() const { return width; }
+int32_t VTRTexture::_get_height() const { return height; }
+bool VTRTexture::_has_alpha() const { return false; }
 
 RID VTRTexture::_get_rid() const {
-    // This is the magic that allows this class to act as a real Texture2D
+	if (!texture_rid.is_valid()) { const_cast<VTRTexture*>(this)->_ensure_rid();}
     return texture_rid;
+}
+
+void VTRTexture::_ensure_rid()
+{
+	if (texture_rid.is_valid()) return;
+    Ref<Image> placeholder = Image::create_empty(1, 1, false, Image::FORMAT_RGBA8);
+    texture_rid = RenderingServer::get_singleton()->texture_2d_create(placeholder);
 }
 
 void VTRTexture::set_port(const int32_t p_port) {
