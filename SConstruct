@@ -9,6 +9,7 @@ from SCons.Environment import Environment as SConsEnvironment
 # SCons is used to build the godot-cpp bindings first.
 # We type-hint 'env' so IntelliSense knows available methods (Append, ParseConfig, etc.)
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct") # type: ignore
+env["ENV"].update(os.environ)
 
 # --- Configuration ---
 
