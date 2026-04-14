@@ -1,7 +1,10 @@
 #pragma once
 #include <condition_variable>
+#include <cstdint>
+#include <mutex>
 #include <queue>
-#include <span>
+#include <utility>
+#include <vector>
 namespace VTR
 {
 template<typename T>
@@ -15,7 +18,7 @@ public:
         q.push(std::move(val));
         cv.notify_one();
     }
-    
+
     bool pop(T& val) {
         std::unique_lock<std::mutex> lock(m);
         cv.wait(lock, [this]{ return !q.empty(); });
@@ -24,5 +27,5 @@ public:
         return true;
     }
 };
-using Que = SafeQueue<std::span<uint8_t>>;
+using Que = SafeQueue<std::vector<uint8_t>>;
 }

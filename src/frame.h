@@ -1,7 +1,5 @@
 #pragma once
 #include <cstdint>
-#include <map>
-#include <vector>
 
 #pragma pack(push, 1)
 struct UDPHeader {

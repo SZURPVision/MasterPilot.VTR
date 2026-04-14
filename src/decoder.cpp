@@ -2,6 +2,8 @@
 #include "time_analyzer.hpp"
 #include <iostream>
 #include <cstring>
+#include <limits>
+#include <vector>
 
 namespace VTR
 {
@@ -99,7 +101,7 @@ void Decoder::cleanup()
 
 void Decoder::decode_loop()
 {
-    std::span<uint8_t> data;
+    std::vector<uint8_t> data;
     while (running)
     {
         // Blocking pop from safe queue
@@ -109,19 +111,23 @@ void Decoder::decode_loop()
 
         if (data.empty()) continue; // Skip empty keep-alive packets
 
-        // Prepare packet
-        // Note: We use the data directly. We assume the vector stays valid until we process it.
-        // Actually av_packet_from_data is unsafe if we don't own the buffer. 
-        // Safer to copy or ensure lifetime. Here we copy into the packet struct ref.
-        
+        if (data.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+            std::cerr << "[Decoder] Packet too large: " << data.size() << std::endl;
+            continue;
+        }
+
         av_packet_unref(pkt);
-		//使用span引用而不是拷贝. ReAssemblyPool保证了span可以活2秒以上
-		pkt->data = data.data();
-		pkt->size = data.size();
-        int ret = avcodec_send_packet(codec_ctx, pkt);
-		//防止释放span
-		pkt->data = nullptr;
-		pkt->size = 0;
+        int ret = av_new_packet(pkt, static_cast<int>(data.size()));
+        if (ret < 0) {
+            char errbuf[64];
+            av_strerror(ret, errbuf, 64);
+            std::cerr << "[Decoder] Error allocating packet: " << errbuf << std::endl;
+            continue;
+        }
+
+        memcpy(pkt->data, data.data(), data.size());
+        ret = avcodec_send_packet(codec_ctx, pkt);
+        av_packet_unref(pkt);
         if (ret < 0) {
             char errbuf[64];
             av_strerror(ret, errbuf, 64);

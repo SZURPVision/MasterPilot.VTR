@@ -3,6 +3,7 @@
 #include <concepts>
 #include <cstdint>
 #include <fstream>
+#include <string>
 #include <vector>
 
 namespace VTR
@@ -21,9 +22,9 @@ namespace VTR
     }
 
     // 保存hevc裸流. 用于debug, 后续可以改造成录屏工具
-    inline void dump_frame(const std::span<uint8_t> &frame_data)
+    inline void dump_frame(const std::span<uint8_t> &frame_data, const std::string& file_path)
     {
-        static std::ofstream dump_file("debug_dump.hevc", std::ios::binary | std::ios::out);
+        static std::ofstream dump_file(file_path, std::ios::binary | std::ios::out);
         if (dump_file.is_open())
         {
             dump_file.write(reinterpret_cast<const char *>(frame_data.data()), frame_data.size());
