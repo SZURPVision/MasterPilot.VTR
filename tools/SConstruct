@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import os
+
+env = Environment(ENV=os.environ)
+env.Append(CPPPATH=["src"])
+env.Append(CCFLAGS=["-std=c++23", "-Wall", "-Wextra", "-O2", "-pthread"])
+env.Append(LINKFLAGS=["-pthread"])
+
+udp_to_hevc_obj = env.Object(
+    target="bin/udp_to_hevc.o",
+    source="tools/udp_to_hevc.cpp",
+)
+udp_obj = env.Object(
+    target="bin/udp_for_udp_to_hevc.o",
+    source="src/udp.cpp",
+)
+
+env.Program(
+    target="bin/udp_to_hevc",
+    source=[udp_to_hevc_obj, udp_obj],
+)

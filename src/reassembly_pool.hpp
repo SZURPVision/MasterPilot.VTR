@@ -16,14 +16,14 @@ class ReassemblyPool
 public:
     static constexpr size_t buffer_frame_count = 128; //缓冲128帧
     static constexpr size_t mtu = 1400;
-    static constexpr size_t slice_offset = mtu - sizeof(UDPHeader); //每包的偏移量
+    static constexpr size_t slice_offset = mtu - sizeof(FrameHeader); //每包的偏移量
     static constexpr size_t pre_alloc_size = 1080 * 1920 * 2;
     static constexpr size_t slice_pre_alloc_count = (pre_alloc_size + slice_offset - 1) / slice_offset;
     static constexpr int vote_switch_threshold = 5;
 
     ReassemblyPool() = default;
     // 组装包. 组装失败会返回{}. 自带基础检查
-    std::span<uint8_t> push_and_assemble(const UDPHeader& header, const std::span<uint8_t> payload)
+    std::span<uint8_t> push_and_assemble(const FrameHeader& header, const std::span<uint8_t> payload)
     {
         const size_t offset = static_cast<size_t>(header.slice_idx) * slice_offset;
         if (payload.empty()
