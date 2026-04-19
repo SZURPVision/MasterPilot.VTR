@@ -1,9 +1,8 @@
 #include "udp.h"
 #include "frame.h"
 #include "time_analyzer.hpp"
-#include "udp_utils.hpp"
 #include <cstdint>
-#include <format>
+#include <cerrno>
 #include <iostream>
 #include <ostream>
 #include <poll.h>
@@ -48,6 +47,14 @@ bool UDP::start(int port)
 		return false;
 	}
 
+	const int flags = fcntl(fd, F_GETFL, 0);
+	if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+	{
+		std::cerr << "[UDP] Failed to set socket non-blocking" << std::endl;
+		close(fd);
+		return false;
+	}
+
 	sockfd = fd;
 	running = true;
 	recv_worker = std::thread(&UDP::recv_loop, this);
@@ -71,14 +78,14 @@ void UDP::stop()
 }
 void UDP::recv_loop()
 {
-	const int fd = sockfd.load();
-	if (fd < 0)
-		return;
-
 	uint8_t buffer[65536];
 	sockaddr_in cliaddr{};
 	while (running)
 	{
+		const int fd = sockfd.load();
+		if (fd < 0)
+			break;
+
 		TimeAnalyzer timer{"UDP::recv_loop"};
 		pollfd poll_fd{
 			.fd = fd,
@@ -103,6 +110,14 @@ void UDP::recv_loop()
 						  0,
 						  reinterpret_cast<sockaddr *>(&cliaddr),
 						  &len);
+		if (n < 0)
+		{
+			if (!running)
+				break;
+			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+				continue;
+			break;
+		}
 		if (n < static_cast<ssize_t>(sizeof(UDPHeader)))
 			continue;
 		process_packet(buffer, n);
@@ -125,20 +140,8 @@ void UDP::process_packet(uint8_t *raw_buf, ssize_t n)
 	};
 	auto ret = asm_pool.push_and_assemble(frame_header, payload);
 
-#if DEBUG_ENABLED
-	// std::span<uint8_t> raw_buffer_span = {raw_buf, raw_buf + n};
-	// auto file_name = std::format("dump/{}-{}-{}.hex",header->frame_id,header->slice_idx,header->total_size);
-	// dump_frame( raw_buffer_span, file_name);
-	// std::cout<<"dumped frame "<<file_name<<std::endl;
-	std::cout << std::format("{},{},{},{}",frame_header.frame_id,frame_header.slice_idx,frame_header.total_size,n - sizeof(UDPHeader)) << std::endl;
-#endif
-
 	if (!ret.empty())
 	{
 		output_queue.push(std::vector<uint8_t>{ret.begin(), ret.end()});
-#if DEBUG_ENABLED
-		std::cout<<"----- valid frame -----"<<std::endl;
-		dump_frame(ret, "debug_dump.hevc");
-#endif
 	}
 }

@@ -15,12 +15,11 @@ VTRTexture::VTRTexture()
 }
 
 VTRTexture::~VTRTexture() {
-    // 1. Stop threads first to prevent callbacks during destruction
-    set_active(false);
+    _stop_runtime(true);
     
-    // 2. Clean up the GPU resource
     if (texture_rid.is_valid()) {
         RenderingServer::get_singleton()->free_rid(texture_rid);
+        texture_rid = RID();
     }
 }
 
@@ -64,8 +63,30 @@ bool VTRTexture::get_active() const {
     return active;
 }
 
+void VTRTexture::_notification(int p_what) {
+    if (p_what == NOTIFICATION_PREDELETE) {
+        _stop_runtime(true);
+    }
+}
+
+void VTRTexture::_stop_runtime(bool p_is_teardown) {
+    if (p_is_teardown) {
+        tearing_down.store(true);
+        decoder.set_on_frame_decoded(nullptr);
+    }
+
+    active = false;
+    udp.stop();
+    decoder.stop();
+}
+
 void VTRTexture::_sync_state() {
     if (active) {
+        if (tearing_down.load()) {
+            active = false;
+            return;
+        }
+
         // Clear queue before starting to avoid processing old data
         // (Accessing queue directly might require friend access or a clear() method on SafeQueue, 
         //  but simpler is just to let the decoder chew through it or logic in UDP::start)
@@ -76,16 +97,18 @@ void VTRTexture::_sync_state() {
         if (!udp_started || !dec_started) {
             UtilityFunctions::printerr("[VTRTexture] Failed to start components.");
             active = false;
-            udp.stop();
-            decoder.stop();
+            _stop_runtime(false);
         }
     } else {
-        udp.stop();
-        decoder.stop();
+        _stop_runtime(false);
     }
 }
 
 void VTRTexture::_on_decoder_frame(const uint8_t* data, int p_width, int p_height) {
+    if (tearing_down.load() || !active) {
+        return;
+    }
+
 	TimeAnalyzer timer{"VTRTexure::on_decoder_frame"};
     // [Decoder Thread]
     // We cannot touch RenderingServer or Ref<Image> safely here.
@@ -103,8 +126,14 @@ void VTRTexture::_on_decoder_frame(const uint8_t* data, int p_width, int p_heigh
 }
 
 void VTRTexture::_update_texture_on_main_thread(const PackedByteArray& p_data, int p_width, int p_height) {
+    if (tearing_down.load() || !active || is_queued_for_deletion()) {
+        return;
+    }
+
 	TimeAnalyzer timer{"VTRTexure::update_texture_on_main_thread"};
     // [Main Thread]
+
+    _ensure_rid();
     
     // Create an image wrapper around the data (efficient, mostly metadata)
     Ref<Image> img = Image::create_from_data(p_width, p_height, false, Image::FORMAT_RGBA8, p_data);

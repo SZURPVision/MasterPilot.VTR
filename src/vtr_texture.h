@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/mutex_lock.hpp>
+#include <atomic>
 
 // Include subsystem headers
 #include "udp.h"
@@ -34,6 +35,7 @@ public:
 
 protected:
     static void _bind_methods();
+    void _notification(int p_what);
 
 private:
     // Properties
@@ -50,9 +52,11 @@ private:
     RID texture_rid;
     int32_t width = 16;
     int32_t height = 9;
+    std::atomic<bool> tearing_down{false};
 
     // Callbacks and Internal Logic
     void _sync_state(); // Starts/Stops components based on active flag
+    void _stop_runtime(bool p_is_teardown);
     
     // Callback running on Decoder thread
     void _on_decoder_frame(const uint8_t* data, int p_width, int p_height);
