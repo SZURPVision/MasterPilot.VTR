@@ -1,6 +1,7 @@
 #include "vtr_texture.h"
 #include "time_analyzer.hpp"
 
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 
@@ -61,6 +62,31 @@ void VTRTexture::set_active(const bool p_active) {
 
 bool VTRTexture::get_active() const {
     return active;
+}
+
+bool VTRTexture::start_recording(const String& p_path, int64_t p_session_offset_usec) {
+    String absolute_path = ProjectSettings::get_singleton()->globalize_path(p_path);
+    auto utf8 = absolute_path.utf8();
+    bool started = udp.start_recording(utf8.get_data(), p_session_offset_usec);
+    if (!started) {
+        UtilityFunctions::printerr(vformat(
+            "[VTRTexture] Failed to start video recording: %s (%s)",
+            absolute_path,
+            get_last_recording_error()));
+    }
+    return started;
+}
+
+void VTRTexture::stop_recording() {
+    udp.stop_recording();
+}
+
+bool VTRTexture::is_recording() const {
+    return udp.is_recording();
+}
+
+String VTRTexture::get_last_recording_error() const {
+    return String(udp.get_last_recording_error().c_str());
 }
 
 void VTRTexture::_notification(int p_what) {
@@ -165,6 +191,11 @@ void VTRTexture::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_active"), &VTRTexture::get_active);
     ClassDB::bind_method(D_METHOD("set_active", "p_active"), &VTRTexture::set_active);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "active"), "set_active", "get_active");
+
+    ClassDB::bind_method(D_METHOD("start_recording", "path", "session_offset_usec"), &VTRTexture::start_recording);
+    ClassDB::bind_method(D_METHOD("stop_recording"), &VTRTexture::stop_recording);
+    ClassDB::bind_method(D_METHOD("is_recording"), &VTRTexture::is_recording);
+    ClassDB::bind_method(D_METHOD("get_last_recording_error"), &VTRTexture::get_last_recording_error);
 
     // Bind internal method for call_deferred
     ClassDB::bind_method(D_METHOD("_update_texture_on_main_thread", "data", "width", "height"), &VTRTexture::_update_texture_on_main_thread);

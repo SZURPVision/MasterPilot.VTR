@@ -2,6 +2,7 @@
 
 #include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/mutex_lock.hpp>
 #include <atomic>
@@ -32,6 +33,11 @@ public:
 
     void set_active(const bool p_active);
     bool get_active() const;
+
+    bool start_recording(const String& p_path, int64_t p_session_offset_usec);
+    void stop_recording();
+    bool is_recording() const;
+    String get_last_recording_error() const;
 
 protected:
     static void _bind_methods();

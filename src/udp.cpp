@@ -20,6 +20,7 @@ using namespace VTR;
 UDP::~UDP()
 {
 	stop();
+	stop_recording();
 }
 
 bool UDP::start(int port)
@@ -76,6 +77,27 @@ void UDP::stop()
 		recv_worker.join();
 	}
 }
+
+bool UDP::start_recording(const std::string& path, int64_t session_offset_usec)
+{
+	return muxer.start(path, session_offset_usec);
+}
+
+void UDP::stop_recording()
+{
+	muxer.stop();
+}
+
+bool UDP::is_recording() const
+{
+	return muxer.is_recording();
+}
+
+std::string UDP::get_last_recording_error() const
+{
+	return muxer.get_last_error();
+}
+
 void UDP::recv_loop()
 {
 	uint8_t buffer[65536];
@@ -142,6 +164,8 @@ void UDP::process_packet(uint8_t *raw_buf, ssize_t n)
 
 	if (!ret.empty())
 	{
+		if (muxer.is_recording())
+			muxer.enqueue_access_unit(std::vector<uint8_t>{ret.begin(), ret.end()});
 		output_queue.push(std::vector<uint8_t>{ret.begin(), ret.end()});
 	}
 }

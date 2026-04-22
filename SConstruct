@@ -24,11 +24,11 @@ platform: str = env["platform"] # type: ignore
 if platform == "linux":
     # Use pkg-config to find FFmpeg libraries (Robust method)
     # We check for the existence of the libraries first
-    if os.system("pkg-config --exists libavcodec libavutil libswscale") == 0:
-        env.ParseConfig("pkg-config --cflags --libs libavcodec libavutil libswscale")
+    if os.system("pkg-config --exists libavcodec libavformat libavutil libswscale") == 0:
+        env.ParseConfig("pkg-config --cflags --libs libavcodec libavformat libavutil libswscale")
     else:
         print("Error: FFmpeg libraries not found via pkg-config.")
-        print("Please install: libavcodec-dev libavutil-dev libswscale-dev")
+        print("Please install: libavcodec-dev libavformat-dev libavutil-dev libswscale-dev")
         sys.exit(1)
 
 # --- Sources ---

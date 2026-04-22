@@ -26,6 +26,13 @@ public:
         q.pop();
         return true;
     }
+
+    void clear() {
+        std::lock_guard<std::mutex> lock(m);
+        while (!q.empty()) {
+            q.pop();
+        }
+    }
 };
 using Que = SafeQueue<std::vector<uint8_t>>;
 }
