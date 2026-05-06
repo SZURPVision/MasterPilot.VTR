@@ -59,7 +59,7 @@ bool UDP::start(int port)
 	sockfd = fd;
 	running = true;
 	recv_worker = std::thread(&UDP::recv_loop, this);
-	std::cout << "UDP started" << std::endl;
+	std::cout << "[UDP] UDP started" << std::endl;
 	return true;
 }
 void UDP::stop()

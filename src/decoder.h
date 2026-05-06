@@ -36,9 +36,13 @@ private:
     const AVCodec* codec = nullptr;
     AVCodecContext* codec_ctx = nullptr;
     AVFrame* frame = nullptr;
+    AVFrame* sw_frame = nullptr;
     AVFrame* frame_rgb = nullptr;
     AVPacket* pkt = nullptr;
     SwsContext* sws_ctx = nullptr;
+
+    AVBufferRef* hw_device_ctx = nullptr;
+    static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts);
 
     uint8_t* rgb_buffer = nullptr;
     int current_width = 0;

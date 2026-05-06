@@ -14,13 +14,23 @@ Decoder::~Decoder()
     cleanup();
 }
 
+enum AVPixelFormat Decoder::get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts)
+{
+    const enum AVPixelFormat* p;
+    for (p = pix_fmts; *p != -1; p++) {
+        if (*p == AV_PIX_FMT_VAAPI) {
+            return *p;
+        }
+    }
+    std::cerr << "[Decoder] Failed to get HW surface format." << std::endl;
+    return AV_PIX_FMT_NONE;
+}
+
 bool Decoder::start()
 {
     if (running) return true;
 
     // Initialize FFmpeg codec
-    // Note: older ffmpeg versions might need av_register_all(), but it's deprecated/removed in new ones.
-    
     codec = avcodec_find_decoder(AV_CODEC_ID_HEVC);
     if (!codec) {
         std::cerr << "[Decoder] Codec not found: HEVC" << std::endl;
@@ -33,18 +43,27 @@ bool Decoder::start()
         return false;
     }
 
-    // If you have extradata (SPS/PPS) it should be passed here, 
-    // otherwise the decoder might assume in-band parameters.
+    // Initialize VAAPI hardware context
+    int err = av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
+    if (err < 0) {
+        std::cerr << "[Decoder] Failed to create a VAAPI device. Falling back to software decoding." << std::endl;
+    } else {
+        codec_ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+        codec_ctx->get_format = get_hw_format;
+        std::cout << "[Decoder] VAAPI hardware device context created." << std::endl;
+    }
+
     if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
         std::cerr << "[Decoder] Could not open codec" << std::endl;
         return false;
     }
 
     frame = av_frame_alloc();
+    sw_frame = av_frame_alloc();
     frame_rgb = av_frame_alloc();
     pkt = av_packet_alloc();
 
-    if (!frame || !frame_rgb || !pkt) {
+    if (!frame || !sw_frame || !frame_rgb || !pkt) {
         std::cerr << "[Decoder] Could not allocate frames or packet" << std::endl;
         return false;
     }
@@ -81,6 +100,10 @@ void Decoder::cleanup()
         av_frame_free(&frame);
         frame = nullptr;
     }
+    if (sw_frame) {
+        av_frame_free(&sw_frame);
+        sw_frame = nullptr;
+    }
     if (frame_rgb) {
         av_frame_free(&frame_rgb);
         frame_rgb = nullptr;
@@ -88,6 +111,10 @@ void Decoder::cleanup()
     if (pkt) {
         av_packet_free(&pkt);
         pkt = nullptr;
+    }
+    if (hw_device_ctx) {
+        av_buffer_unref(&hw_device_ctx);
+        hw_device_ctx = nullptr;
     }
     if (sws_ctx) {
         sws_freeContext(sws_ctx);
@@ -153,12 +180,25 @@ void Decoder::decode_loop()
 
 void Decoder::process_frame(AVFrame* src_frame)
 {
-	TimeAnalyzer timer{"Decoder::process_frame"};
+    TimeAnalyzer timer{"Decoder::process_frame"};
+    AVFrame* tmp_frame = src_frame;
+
+    // If it's a hardware frame, transfer it to CPU memory
+    if (src_frame->format == AV_PIX_FMT_VAAPI) {
+        av_frame_unref(sw_frame);
+        int ret = av_hwframe_transfer_data(sw_frame, src_frame, 0);
+        if (ret < 0) {
+            std::cerr << "[Decoder] Error transferring data from GPU to CPU" << std::endl;
+            return;
+        }
+        tmp_frame = sw_frame;
+    }
+
     // Check if resolution changed or we need to init sws context
-    if (src_frame->width != current_width || src_frame->height != current_height || !sws_ctx) {
+    if (tmp_frame->width != current_width || tmp_frame->height != current_height || !sws_ctx) {
         
-        current_width = src_frame->width;
-        current_height = src_frame->height;
+        current_width = tmp_frame->width;
+        current_height = tmp_frame->height;
 
         // Cleanup old SWS context
         if (sws_ctx) {
@@ -172,10 +212,10 @@ void Decoder::process_frame(AVFrame* src_frame)
             rgb_buffer = nullptr;
         }
 
-        // Create SWS Context: HEVC is usually YUV420P. Target is RGBA for Godot.
+        // Create SWS Context: Input format depends on the transferred frame (usually NV12 for VAAPI)
         sws_ctx = sws_getContext(
-            current_width, current_height, codec_ctx->pix_fmt, // Input
-            current_width, current_height, AV_PIX_FMT_RGBA,    // Output
+            current_width, current_height, (AVPixelFormat)tmp_frame->format, // Input
+            current_width, current_height, AV_PIX_FMT_RGBA,                 // Output
             SWS_BILINEAR, NULL, NULL, NULL
         );
 
@@ -194,7 +234,7 @@ void Decoder::process_frame(AVFrame* src_frame)
     }
 
     // Convert YUV to RGBA
-    sws_scale(sws_ctx, (const uint8_t * const*)src_frame->data, src_frame->linesize, 0,
+    sws_scale(sws_ctx, (const uint8_t * const*)tmp_frame->data, tmp_frame->linesize, 0,
               current_height, frame_rgb->data, frame_rgb->linesize);
 
     // Notify callback
