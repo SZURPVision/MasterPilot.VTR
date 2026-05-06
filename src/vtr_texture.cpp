@@ -10,8 +10,8 @@ using namespace godot;
 VTRTexture::VTRTexture() 
     : udp(queue), decoder(queue) // Initialize subsystems with the shared queue
 {
-    decoder.set_on_frame_decoded([this](const uint8_t* data, int w, int h) {
-        this->_on_decoder_frame(data, w, h);
+    decoder.set_on_frame_decoded([this](const uint8_t* y_data, const uint8_t* uv_data, int w, int h, int ys, int uvs) {
+        this->_on_decoder_frame(y_data, uv_data, w, h, ys, uvs);
     });
 }
 
@@ -113,10 +113,6 @@ void VTRTexture::_sync_state() {
             return;
         }
 
-        // Clear queue before starting to avoid processing old data
-        // (Accessing queue directly might require friend access or a clear() method on SafeQueue, 
-        //  but simpler is just to let the decoder chew through it or logic in UDP::start)
-        
         bool udp_started = udp.start(port);
         bool dec_started = decoder.start();
         
@@ -130,22 +126,32 @@ void VTRTexture::_sync_state() {
     }
 }
 
-void VTRTexture::_on_decoder_frame(const uint8_t* data, int p_width, int p_height) {
+void VTRTexture::_on_decoder_frame(const uint8_t* y_data, const uint8_t* uv_data, int p_width, int p_height, int y_stride, int uv_stride) {
     if (tearing_down.load() || !active) {
         return;
     }
 
 	TimeAnalyzer timer{"VTRTexure::on_decoder_frame"};
-    // [Decoder Thread]
-    // We cannot touch RenderingServer or Ref<Image> safely here.
-    // We copy the raw data into a Godot PackedByteArray.
+    
+    // For NV12, Y plane is W * H. UV plane is W * (H / 2).
+    // Total height of the texture will be H + H / 2.
+    int packed_height = p_height + p_height / 2;
+    int size = p_width * packed_height; 
     
     PackedByteArray pba;
-    int size = p_width * p_height * 4; // RGBA8 = 4 bytes per pixel
     pba.resize(size);
-    
-    // memcpy is fast; copy data into the Godot-managed buffer
-    memcpy(pba.ptrw(), data, size);
+    uint8_t* dst = pba.ptrw();
+
+    // Copy Y plane line by line (to handle stride)
+    for (int i = 0; i < p_height; ++i) {
+        memcpy(dst + i * p_width, y_data + i * y_stride, p_width);
+    }
+
+    // Copy UV plane line by line
+    uint8_t* uv_dst = dst + p_width * p_height;
+    for (int i = 0; i < p_height / 2; ++i) {
+        memcpy(uv_dst + i * p_width, uv_data + i * uv_stride, p_width);
+    }
     
     // Defer the actual update to the main thread
     call_deferred("_update_texture_on_main_thread", pba, p_width, p_height);
@@ -161,8 +167,9 @@ void VTRTexture::_update_texture_on_main_thread(const PackedByteArray& p_data, i
 
     _ensure_rid();
     
-    // Create an image wrapper around the data (efficient, mostly metadata)
-    Ref<Image> img = Image::create_from_data(p_width, p_height, false, Image::FORMAT_RGBA8, p_data);
+    // NV12 packed into a single L8 texture with height = H * 1.5
+    int packed_height = p_height + p_height / 2;
+    Ref<Image> img = Image::create_from_data(p_width, packed_height, false, Image::FORMAT_L8, p_data);
     
     // Check if the resolution has changed (or if this is the first frame updating the 1x1 placeholder)
     if (width != p_width || height != p_height) {

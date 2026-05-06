@@ -65,7 +65,7 @@ private:
     void _stop_runtime(bool p_is_teardown);
     
     // Callback running on Decoder thread
-    void _on_decoder_frame(const uint8_t* data, int p_width, int p_height);
+    void _on_decoder_frame(const uint8_t* y_data, const uint8_t* uv_data, int p_width, int p_height, int y_stride, int uv_stride);
 
     // Internal method called via call_deferred on Main Thread
     void _update_texture_on_main_thread(const PackedByteArray& p_data, int p_width, int p_height);

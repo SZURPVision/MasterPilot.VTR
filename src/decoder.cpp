@@ -194,54 +194,21 @@ void Decoder::process_frame(AVFrame* src_frame)
         tmp_frame = sw_frame;
     }
 
-    // Check if resolution changed or we need to init sws context
-    if (tmp_frame->width != current_width || tmp_frame->height != current_height || !sws_ctx) {
-        
-        current_width = tmp_frame->width;
-        current_height = tmp_frame->height;
+    current_width = tmp_frame->width;
+    current_height = tmp_frame->height;
 
-        // Cleanup old SWS context
-        if (sws_ctx) {
-            sws_freeContext(sws_ctx);
-            sws_ctx = nullptr;
-        }
-        
-        // Cleanup old buffer
-        if (rgb_buffer) {
-            av_free(rgb_buffer);
-            rgb_buffer = nullptr;
-        }
-
-        // Create SWS Context: Input format depends on the transferred frame (usually NV12 for VAAPI)
-        sws_ctx = sws_getContext(
-            current_width, current_height, (AVPixelFormat)tmp_frame->format, // Input
-            current_width, current_height, AV_PIX_FMT_RGBA,                 // Output
-            SWS_BILINEAR, NULL, NULL, NULL
-        );
-
-        if (!sws_ctx) {
-            std::cerr << "[Decoder] Could not initialize SwsContext" << std::endl;
-            return;
-        }
-
-        // Allocate buffer for RGBA
-        int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, current_width, current_height, 1);
-        rgb_buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
-
-        // Assign buffer to rgb frame
-        av_image_fill_arrays(frame_rgb->data, frame_rgb->linesize, rgb_buffer,
-                             AV_PIX_FMT_RGBA, current_width, current_height, 1);
-    }
-
-    // Convert YUV to RGBA
-    sws_scale(sws_ctx, (const uint8_t * const*)tmp_frame->data, tmp_frame->linesize, 0,
-              current_height, frame_rgb->data, frame_rgb->linesize);
-
-    // Notify callback
+    // Notify callback with NV12 planes
     std::lock_guard<std::mutex> lock(cb_mtx);
     if (on_frame_ready) {
-        // frame_rgb->data[0] points to the start of the packed RGBA buffer
-        on_frame_ready(frame_rgb->data[0], current_width, current_height);
+        // NV12: data[0] is Y plane, data[1] is UV interleaved plane
+        on_frame_ready(
+            tmp_frame->data[0], 
+            tmp_frame->data[1], 
+            current_width, 
+            current_height,
+            tmp_frame->linesize[0],
+            tmp_frame->linesize[1]
+        );
     }
 }
 

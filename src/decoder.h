@@ -4,6 +4,7 @@
 #include <atomic>
 #include <functional>
 #include <thread>
+#include <mutex>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -16,7 +17,7 @@ class Decoder
 {
 public:
 
-    using FrameCallback = std::function<void(const uint8_t*, int, int)>;
+    using FrameCallback = std::function<void(const uint8_t* y_data, const uint8_t* uv_data, int, int, int y_stride, int uv_stride)>;
 
     Decoder(Que& q) : input_queue(q){}
     ~Decoder();
