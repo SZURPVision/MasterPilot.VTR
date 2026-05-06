@@ -6,5 +6,5 @@ reloadable = true
 
 [libraries]
 
-linux.debug.x86_64 = "res://addons/vtr_texture/bin/libvtrtexture.linux.template_debug.dev.x86_64.so"
+linux.debug.x86_64 = "res://addons/vtr_texture/bin/libvtrtexture.linux.template_debug.x86_64.so"
 linux.release.x86_64 = "res://addons/vtr_texture/bin/libvtrtexture.linux.template_release.x86_64.so"

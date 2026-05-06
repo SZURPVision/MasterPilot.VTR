@@ -20,14 +20,12 @@ env.Append(CCFLAGS=["-std=c++23", "-fPIC","-fvisibility=hidden"])
 env.Append(LINKFLAGS=["-fvisibility=hidden"])
 
 # --- Platform: Linux ---
-# Accessing dictionary keys on 'env' usually returns generic types, so we check carefully.
 platform: str = env["platform"] # type: ignore
 runtime_rpath = "$ORIGIN:/usr/lib:/usr/lib64:/lib:/lib64"
 patchelf_path = None
 
 if platform == "linux":
     # Nix compiler wrappers inject store paths through these env vars.
-    # Clear them so the resulting extension does not carry /nix/store RUNPATHs.
     for key in (
         "NIX_LDFLAGS",
         "NIX_CFLAGS_COMPILE",
@@ -36,19 +34,14 @@ if platform == "linux":
     ):
         env["ENV"].pop(key, None)
 
-    # Use pkg-config to find FFmpeg libraries (Robust method)
-    # We check for the existence of the libraries first
+    # Use pkg-config to find FFmpeg libraries
     if os.system("pkg-config --exists libavcodec libavformat libavutil libswscale") == 0:
         env.ParseConfig("pkg-config --cflags --libs libavcodec libavformat libavutil libswscale")
     else:
         print("Error: FFmpeg libraries not found via pkg-config.")
-        print("Please install: libavcodec-dev libavformat-dev libavutil-dev libswscale-dev")
         sys.exit(1)
 
-    # Keep runtime lookup portable: local directory first, then standard FHS locations.
-    env.Append(LINKFLAGS=[
-        "-Wl,-rpath,$$ORIGIN:/usr/lib:/usr/lib64:/lib:/lib64"
-    ])
+    env.Append(LINKFLAGS=["-Wl,-rpath,$$ORIGIN:/usr/lib:/usr/lib64:/lib:/lib64"])
     patchelf_path = shutil.which("patchelf", path=env["ENV"].get("PATH"))
 
 # --- Sources ---
@@ -56,7 +49,7 @@ sources = Glob("src/*.cpp")
 
 # --- Build ---
 # Create the shared library
-target_name: str = "bin/vtrtexture{}{}".format(
+target_name: str = "addons/vtr_texture/bin/vtrtexture{}{}".format(
     env["suffix"], env["SHLIBSUFFIX"] # type: ignore
 )
 
@@ -72,12 +65,9 @@ if platform == "linux" and patchelf_path:
             check=True,
             env=env["ENV"],
         )
-
     env.AddPostAction(library, normalize_runpath) # type: ignore
 
 # --- Compilation Database ---
-# Generates compile_commands.json for LSP support (clangd/VSCode)
-# Note: CompilationDatabase is a method available in modern SCons environments
 compile_db = env.CompilationDatabase(target="compile_commands.json") # type: ignore
 
 Default(library, compile_db)
