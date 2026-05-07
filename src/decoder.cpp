@@ -197,6 +197,30 @@ void Decoder::process_frame(AVFrame* src_frame)
     current_width = tmp_frame->width;
     current_height = tmp_frame->height;
 
+    // 核心修复：确保始终输出 NV12。
+    // 如果不是 NV12（例如真实源输出 yuv420p），我们利用 sws_scale 转换。
+    if (tmp_frame->format != AV_PIX_FMT_NV12) {
+        sws_ctx = sws_getCachedContext(sws_ctx,
+            current_width, current_height, (AVPixelFormat)tmp_frame->format,
+            current_width, current_height, AV_PIX_FMT_NV12,
+            SWS_POINT, NULL, NULL, NULL);
+        
+        if (sws_ctx) {
+            if (frame_rgb->format != AV_PIX_FMT_NV12 || frame_rgb->width != current_width || frame_rgb->height != current_height) {
+                av_frame_unref(frame_rgb);
+                frame_rgb->format = AV_PIX_FMT_NV12;
+                frame_rgb->width = current_width;
+                frame_rgb->height = current_height;
+                if (av_frame_get_buffer(frame_rgb, 0) < 0) {
+                    return;
+                }
+            }
+            sws_scale(sws_ctx, tmp_frame->data, tmp_frame->linesize, 0, current_height,
+                      frame_rgb->data, frame_rgb->linesize);
+            tmp_frame = frame_rgb;
+        }
+    }
+
     // Notify callback with NV12 planes
     std::lock_guard<std::mutex> lock(cb_mtx);
     if (on_frame_ready) {
