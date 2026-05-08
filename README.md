@@ -1,25 +1,27 @@
 # Video Transmission Receiver (VTR)
-这是MasterPilot的图传接收模块,封装了从UDP到Godot纹理的全部操作
+这是MasterPilot的图传接收模块,封装了从UDP到Godot显示的全部操作
 
 **注意: 本模块仅支持linux环境**
 
 ## 使用方法
 - 编译项目,添加到addons (参考example文件夹)
-- 创建一个能渲染Texture2D的控件,比如TextureRect,设置Texture为VTRTexture,并且设置UDP属性,将active设为true
+- 在场景中添加 `VTRControl` 节点
+- 设置 `port` 属性 (默认5000)
+- 将 `active` 设为 `true`
 
-**注: 如果多个地方需要使用同一图传,需要创建一个资源,并在多个地方引用这个资源,从而避免重复启动UDP和解码**
+**注: VTRControl 继承自 TextureRect, 内部自动处理了 YUV 解码和渲染, 无需手动编写 Shader 或 GDScript.**
 
 ## 架构
 ```mermaid
 graph
 
-VTRTexture
+VTRControl
 UDP
 Decoder
 
-VTRTexture --"启动和停止,设置port..."--> UDP
+VTRControl --"启动和停止,设置port..."--> UDP
 UDP --"解析UDP流,拼接hevc码流"--> Decoder
-Decoder --"解码并回调"-->VTRTexture
+Decoder --"解码并回调"-->VTRControl
 
 ```
 

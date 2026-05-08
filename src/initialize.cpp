@@ -1,4 +1,4 @@
-#include "vtr_texture.h"
+#include "vtr_control.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
@@ -9,7 +9,7 @@ using namespace godot;
 void initialize_vtr_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
 	std::cout<<"[VTR]Registering ClassDB"<< std::endl;
-    ClassDB::register_class<VTRTexture>();
+    ClassDB::register_class<VTRControl>();
 }
 
 void uninitialize_vtr_module(ModuleInitializationLevel p_level) {

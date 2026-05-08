@@ -1,7 +1,5 @@
 [gd_scene format=3 uid="uid://cjkb1lnam6qmx"]
 
-[ext_resource type="Script" uid="uid://c6soso4avgw1h" path="res://texture_rect.gd" id="1_37kl0"]
-
 [node name="Test" type="Control" unique_id=174592565]
 layout_mode = 3
 anchors_preset = 15
@@ -10,11 +8,12 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TextureRect" type="TextureRect" parent="." unique_id=2013462337]
+[node name="VTRControl" type="VTRControl" parent="." unique_id=2013462337]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_37kl0")
+port = 3334
+active = true
