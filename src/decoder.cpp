@@ -4,9 +4,35 @@
 #include <cstring>
 #include <limits>
 #include <vector>
+#include <fstream>
+#include <string>
+#include <filesystem>
 
 namespace VTR
 {
+
+// Helper to find preferred VAAPI device (Intel: 0x8086, AMD: 0x1002)
+static std::string find_preferred_hw_device() {
+    for (int i = 128; i < 135; ++i) {
+        std::string base = "renderD" + std::to_string(i);
+        std::filesystem::path device_path = "/dev/dri/" + base;
+        std::filesystem::path vendor_path = "/sys/class/drm/" + base + "/device/vendor";
+
+        if (std::filesystem::exists(vendor_path)) {
+            std::ifstream ifs(vendor_path.string());
+            if (ifs.is_open()) {
+                std::string vendor;
+                ifs >> vendor;
+                // Intel (0x8086) or AMD (0x1002)
+                if (vendor.find("0x8086") != std::string::npos || 
+                    vendor.find("0x1002") != std::string::npos) {
+                    return device_path.string();
+                }
+            }
+        }
+    }
+    return "";
+}
 
 Decoder::~Decoder()
 {
@@ -19,11 +45,13 @@ enum AVPixelFormat Decoder::get_hw_format(AVCodecContext* ctx, const enum AVPixe
     const enum AVPixelFormat* p;
     for (p = pix_fmts; *p != -1; p++) {
         if (*p == AV_PIX_FMT_VAAPI) {
+            std::cout << "[Decoder] VA-API hardware format (AV_PIX_FMT_VAAPI) selected for decoding." << std::endl;
             return *p;
         }
     }
-    std::cerr << "[Decoder] Failed to get HW surface format." << std::endl;
-    return AV_PIX_FMT_NONE;
+    std::cerr << "[Decoder] VA-API hardware acceleration is not supported by the codec/stream. Falling back to software decoding." << std::endl;
+    // Return the first available software format (usually YUV420P or NV12)
+    return pix_fmts[0];
 }
 
 bool Decoder::start()
@@ -43,14 +71,45 @@ bool Decoder::start()
         return false;
     }
 
+    // Prioritize device selection:
+    // 1. Environment variable MASTERPILOT_VAAPI_DEVICE
+    // 2. Preferred iGPU (Intel/AMD)
+    // 3. Auto-detection (NULL)
+    const char* device_env = std::getenv("MASTERPILOT_VAAPI_DEVICE");
+    std::string preferred_device;
+    const char* target_device = NULL;
+
+    if (device_env) {
+        target_device = device_env;
+        std::cout << "[Decoder] Using VA-API device from environment: " << target_device << std::endl;
+    } else {
+        preferred_device = find_preferred_hw_device();
+        if (!preferred_device.empty()) {
+            target_device = preferred_device.c_str();
+            std::cout << "[Decoder] Found preferred hardware device (Intel/AMD): " << target_device << std::endl;
+        } else {
+            std::cout << "[Decoder] No preferred Intel/AMD device found. Using FFmpeg auto-detection." << std::endl;
+        }
+    }
+
     // Initialize VAAPI hardware context
-    int err = av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
+    int err = av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, target_device, NULL, 0);
     if (err < 0) {
-        std::cerr << "[Decoder] Failed to create a VAAPI device. Falling back to software decoding." << std::endl;
+        // If specific device failed, try one last time with auto-detection
+        if (target_device != NULL) {
+            std::cerr << "[Decoder] VAAPI failed on " << target_device << ", trying FFmpeg auto-detection..." << std::endl;
+            err = av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
+        }
+    }
+
+    if (err < 0) {
+        char errbuf[128];
+        av_strerror(err, errbuf, sizeof(errbuf));
+        std::cerr << "[Decoder] Failed to create a VAAPI device (error: " << errbuf << "). The decoder will use CPU software decoding." << std::endl;
     } else {
         codec_ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
         codec_ctx->get_format = get_hw_format;
-        std::cout << "[Decoder] VAAPI hardware device context created." << std::endl;
+        std::cout << "[Decoder] VA-API hardware device context successfully created." << std::endl;
     }
 
     if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
