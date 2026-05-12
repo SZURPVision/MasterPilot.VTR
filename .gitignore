@@ -8,3 +8,5 @@ extension_api.json
 *.o
 .godot_bin
 dump
+.direnv
+./result

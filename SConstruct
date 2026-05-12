@@ -4,70 +4,40 @@ import shutil
 import subprocess
 import sys
 from typing import List
-# Explicitly import SCons symbols to satisfy VS Code / Pylance
 from SCons.Script import SConscript, Glob, Default
 from SCons.Environment import Environment as SConsEnvironment
 
-# SCons is used to build the godot-cpp bindings first.
-# We type-hint 'env' so IntelliSense knows available methods (Append, ParseConfig, etc.)
-env: SConsEnvironment = SConscript("godot-cpp/SConstruct") # type: ignore
+# 路径感知：默认在当前目录找 godot-cpp，也可通过环境变量覆盖
+godot_cpp_path = os.environ.get("GODOT_CPP_PATH", "godot-cpp")
+
+if not os.path.exists(os.path.join(godot_cpp_path, "SConstruct")):
+    print(f"Error: godot-cpp not found at {godot_cpp_path}. Please check NIX_CONTEXT or submodules.")
+    sys.exit(1)
+
+# --- 核心：一致性编译 ---
+# 直接调用官方 SConscript，它会自动应用 Godot 所需的所有宏定义、ABI 设置和优化参数
+# 由于我们会在 Nix 环境中注入预编译好的 .o 文件，这里运行会非常快
+env: SConsEnvironment = SConscript(os.path.join(godot_cpp_path, "SConstruct")) # type: ignore
 env["ENV"].update(os.environ)
 
-# --- Configuration ---
-
 env.Append(CPPPATH=["src"])
-env.Append(CCFLAGS=["-std=c++23", "-fPIC","-fvisibility=hidden"])
-env.Append(LINKFLAGS=["-fvisibility=hidden"])
+env.Append(CCFLAGS=["-std=c++23", "-fPIC"])
 
-# --- Platform: Linux ---
-platform: str = env["platform"] # type: ignore
-runtime_rpath = "$ORIGIN:/usr/lib:/usr/lib64:/lib:/lib64"
-patchelf_path = None
+# --- FFmpeg Linking ---
+env.ParseConfig("pkg-config --cflags --libs libavcodec libavformat libavutil libswscale libavdevice")
 
-if platform == "linux":
-    # Nix compiler wrappers inject store paths through these env vars.
-    for key in (
-        "NIX_LDFLAGS",
-        "NIX_CFLAGS_COMPILE",
-        "NIX_CXXSTDLIB_COMPILE",
-        "NIX_CC_WRAPPER_FLAGS_SET",
-    ):
-        env["ENV"].pop(key, None)
-
-    # Use pkg-config to find FFmpeg libraries
-    if os.system("pkg-config --exists libavcodec libavformat libavutil libswscale") == 0:
-        env.ParseConfig("pkg-config --cflags --libs libavcodec libavformat libavutil libswscale")
-    else:
-        print("Error: FFmpeg libraries not found via pkg-config.")
-        sys.exit(1)
-
-    env.Append(LINKFLAGS=["-Wl,-rpath,$$ORIGIN:/usr/lib:/usr/lib64:/lib:/lib64"])
-    patchelf_path = shutil.which("patchelf", path=env["ENV"].get("PATH"))
-
-# --- Sources ---
+# --- 源码与目标 ---
 sources = Glob("src/*.cpp")
-
-# --- Build ---
-# Create the shared library
-target_name: str = "addons/vtr_texture/bin/vtrtexture{}{}".format(
+target_name = "addons/vtr_texture/bin/vtrtexture{}{}".format(
     env["suffix"], env["SHLIBSUFFIX"] # type: ignore
 )
 
-library = env.SharedLibrary(
-    target=target_name,
-    source=sources,
-)
+library = env.SharedLibrary(target=target_name, source=sources)
 
-if platform == "linux" and patchelf_path:
-    def normalize_runpath(target: List[str], source: List[str], env: SConsEnvironment, **_kwargs: object) -> None:
-        subprocess.run(
-            [patchelf_path, "--set-rpath", runtime_rpath, str(target[0])],
-            check=True,
-            env=env["ENV"],
-        )
-    env.AddPostAction(library, normalize_runpath) # type: ignore
-
-# --- Compilation Database ---
-compile_db = env.CompilationDatabase(target="compile_commands.json") # type: ignore
-
-Default(library, compile_db)
+# --- 编译数据库 ---
+# 在 Nix 构建沙盒中跳过，因为路径是临时的
+if hasattr(env, "CompilationDatabase") and os.environ.get("VTR_NIX_BUILD") != "1":
+    compile_db = env.CompilationDatabase(target="compile_commands.json") # type: ignore
+    Default(library, compile_db)
+else:
+    Default(library)
