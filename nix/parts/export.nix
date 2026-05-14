@@ -4,12 +4,20 @@
     vtrSrc = pkgs.lib.cleanSourceWith {
       src = ../../.;
       filter = path: type: 
-        let base = baseNameOf path; in
-        (type == "directory" && (base == "src" || base == "addons")) ||
-        (base == "SConstruct" || 
-         pkgs.lib.hasSuffix ".cpp" base || 
-         pkgs.lib.hasSuffix ".h" base || 
-         pkgs.lib.hasSuffix ".hpp" base);
+        let
+          base = baseNameOf (toString path);
+          relPath = pkgs.lib.removePrefix (toString ../../.) (toString path);
+          inFilteredDir = pkgs.lib.hasPrefix "/src" relPath || pkgs.lib.hasPrefix "/addons" relPath;
+        in
+          (type == "directory" && (base == "src" || base == "addons" || inFilteredDir)) ||
+          (inFilteredDir && (
+            pkgs.lib.hasSuffix ".cpp" base || 
+            pkgs.lib.hasSuffix ".h" base || 
+            pkgs.lib.hasSuffix ".hpp" base ||
+            pkgs.lib.hasSuffix ".gdextension" base ||
+            pkgs.lib.hasSuffix ".uid" base
+          )) ||
+          (base == "SConstruct");
     };
 
     mkInstallExample = pkg : pkgs.writeShellScriptBin "install-vtr-example" ''
