@@ -34,29 +34,17 @@
       nativeBuildInputs = [ pkgs.scons pkgs.pkg-config ] ++ pkgs.lib.optional fhs pkgs.patchelf;
       buildInputs = [ self'.packages.ffmpeg-vtr self'.packages.godot-cpp ];
 
-      VTR_NIX_BUILD = if fhs then "1" else "0";
+      VTR_NIX_BUILD = "1";
+      GODOT_CPP_PATH = self'.packages.godot-cpp;
 
       dontPatchELF = fhs;
       dontPatchShebangs = fhs;
 
-      buildPhase =
-        let
-          prepareScript = ''
-            mkdir -p godot-cpp
-            cp -r ${self'.packages.godot-cpp}/* godot-cpp/
-            chmod -R +w godot-cpp
-          '';
-
-          buildScript = ''
-            scons platform=linux \
-                  target=${target} \
-                  ${pkgs.lib.optionalString devBuild "dev_build=yes"}
-          '';
-
-        in ''
-            ${prepareScript}
-            ${buildScript}
-          '';
+      buildPhase = ''
+        scons platform=linux \
+              target=${target} \
+              ${pkgs.lib.optionalString devBuild "dev_build=yes"}
+      '';
 
       installPhase = ''
         mkdir -p $out/addons
