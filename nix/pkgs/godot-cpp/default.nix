@@ -14,6 +14,7 @@ stdenv.mkDerivation {
   buildPhase = ''
     scons platform=linux target=template_debug
     scons platform=linux target=template_release
+    scons compiledb=yes compile_commands.json
   '';
 
   installPhase = ''

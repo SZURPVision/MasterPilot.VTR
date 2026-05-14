@@ -11,13 +11,6 @@
         echo "Checking/Updating VTR compile_commands.json..."
         scons compile_commands.json --silent || echo "Warning: scons failed to generate compile_commands.json"
       fi
-
-      if [ "$GEN_GODOT_CPP_DB" = "1" ]; then
-        if [ -d godot-cpp ]; then
-          echo "Checking/Updating local godot-cpp compile_commands.json..."
-          (cd godot-cpp && scons compiledb=yes compile_commands.json --silent) || echo "Warning: failed to generate godot-cpp DB"
-        fi
-      fi
     '';
   in
   {
