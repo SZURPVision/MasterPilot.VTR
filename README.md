@@ -54,7 +54,7 @@ scons compile_commands.json
 ### 3. 辅助工具
 如果需要进入传统的 FHS 环境（模拟标准 Linux 目录结构）：
 ```sh
-nix run .#vtr-fhs
+nix run .#fhsEnv
 ```
 
 ## 开发与编译
@@ -64,15 +64,14 @@ nix run .#vtr-fhs
 
 **Nix 原生构建 (推荐)**:
 ```sh
-# 编译 Debug 版本 (带 dev_build=yes)
+# 编译 Debug 版本
 nix build .#vtr-debug
 
 # 编译 Release 版本
 nix build .#vtr-release
 
-# 编译并将结果直接同步到本地 addons 文件夹 (自动更新二进制文件)
-nix run .#install -- debug
-nix run .#install -- release
+# 编译并将结果放到example项目下
+nix run .#example-install
 ```
 
 **SCons 手动构建**:

@@ -12,51 +12,66 @@
          pkgs.lib.hasSuffix ".hpp" base);
     };
 
-    mkVtr = { target, devBuild ? false }: pkgs.stdenv.mkDerivation {
+    mkInstallExample = pkg : pkgs.writeShellScriptBin "install-vtr-example" ''
+      DEST="example/addons"
+      mkdir -p "$DEST"
+      ln -sf ${pkg}/addons/* "$DEST/"
+    '';
+
+    mkVtr = { target, devBuild ? false, fhs ? false }: pkgs.stdenv.mkDerivation {
       pname = "vtr-${target}${pkgs.lib.optionalString devBuild "-dev"}";
       version = "0.1.0";
       src = vtrSrc;
 
-      nativeBuildInputs = [ pkgs.scons pkgs.pkg-config ];
+      nativeBuildInputs = [ pkgs.scons pkgs.pkg-config ] ++ pkgs.lib.optional fhs pkgs.patchelf;
       buildInputs = [ self'.packages.ffmpeg-vtr self'.packages.godot-cpp ];
 
-      VTR_NIX_BUILD = "1";
+      VTR_NIX_BUILD = if fhs then "1" else "0";
 
-      buildPhase = ''
-        echo "Hydrating godot-cpp build cache into sandbox..."
-        mkdir -p godot-cpp
-        cp -r ${self'.packages.godot-cpp}/* godot-cpp/
-        chmod -R +w godot-cpp
-        
-        echo "Executing SCons (Incrementally in sandbox)..."
-        scons platform=linux \
-              target=${target} \
-              ${pkgs.lib.optionalString devBuild "dev_build=yes"}
-      '';
+      dontPatchELF = fhs;
+      dontPatchShebangs = fhs;
+
+      buildPhase =
+        let
+          prepareScript = ''
+            mkdir -p godot-cpp
+            cp -r ${self'.packages.godot-cpp}/* godot-cpp/
+            chmod -R +w godot-cpp
+          '';
+
+          buildScript = ''
+            scons platform=linux \
+                  target=${target} \
+                  ${pkgs.lib.optionalString devBuild "dev_build=yes"}
+          '';
+
+        in ''
+            ${prepareScript}
+            ${buildScript}
+          '';
 
       installPhase = ''
-        mkdir -p $out/addons/vtr_texture/bin
-        find addons/vtr_texture/bin -name "*.so" -exec cp -v {} $out/addons/vtr_texture/bin/ \;
+        mkdir -p $out/addons
+        cp -r addons/vtr_texture $out/addons/
+      '';
+
+      postFixup = pkgs.lib.optionalString fhs ''
+        find $out/addons/vtr_texture/bin -name "*.so" -exec ${pkgs.patchelf}/bin/patchelf --set-rpath "" {} \;
       '';
     };
-
-    installScript = pkgs.writeShellScriptBin "vtr-install" ''
-      target=''${1:-debug}
-      OUT_PATH=$(nix build .#vtr-''${target} --no-link --print-out-paths)
-      [ -z "$OUT_PATH" ] && exit 1
-      mkdir -p addons/vtr_texture/bin
-      ln -sf $OUT_PATH/addons/vtr_texture/bin/* addons/vtr_texture/bin/
-    '';
 
   in {
     packages = {
-      vtr-debug = mkVtr { target = "template_debug"; devBuild = false; };
-      vtr-debug-dev = mkVtr { target = "template_debug"; devBuild = true; };
-      vtr-release = mkVtr { target = "template_release"; devBuild = false; };
-      build-nix = self'.packages.vtr-debug;
-      build-nix-dev = self'.packages.vtr-debug-dev;
-      build-fhs = self'.packages.vtr-fhs;
+      vtr-debug = mkVtr { target = "template_debug"; };
+      vtr-debug-dev = mkVtr { target = "template_debug";  };
+      vtr-release = mkVtr { target = "template_release";  };
+      vtr-release-fhs = mkVtr { target = "template_release"; devBuild = false; fhs = true;} ;
     };
-    apps.install = { type = "app"; program = "${installScript}/bin/vtr-install"; };
+
+    # 将输出放到example/addons/, 方便调试
+    apps.install-example = {
+      type = "app";
+      program = mkInstallExample self'.packages.vtr-debug;
+    };
   };
 }

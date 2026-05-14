@@ -1,12 +1,13 @@
 { ... }: {
   perSystem = { pkgs, self', ... }: {
     packages = pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-      vtr-fhs = pkgs.buildFHSEnv {
-        name = "vtr-fhs";
+      fhsEnv = pkgs.buildFHSEnv {
+        name = "fhsEnv";
         targetPkgs = pkgs: with pkgs; [
           scons
           pkg-config
           self'.packages.ffmpeg-vtr
+          self'.packages.godot-cpp
           gcc
           patchelf
           python3
