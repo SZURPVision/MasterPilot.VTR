@@ -18,9 +18,10 @@ if os.environ.get("VTR_NIX_BUILD") == "1":
     env["ENV"].update(os.environ)
 
     # 模拟 godot-cpp SConscript 提供的基本变量
+    platform = ARGUMENTS.get("platform", "linux")
     target = ARGUMENTS.get("target", "template_debug")
-    is_debug = "debug" in target
-    env["suffix"] = ".debug.x86_64" if is_debug else ".release.x86_64"
+    arch = ARGUMENTS.get("arch", "x86_64")
+    env["suffix"] = f".{platform}.{target}.{arch}"
     env["SHLIBSUFFIX"] = ".so"
 
     # 头文件路径
@@ -34,7 +35,7 @@ if os.environ.get("VTR_NIX_BUILD") == "1":
     env.Append(LIBPATH=[os.path.join(godot_cpp_path, "bin")])
 
     # 链接静态库
-    lib_suffix = "template_debug" if is_debug else "template_release"
+    lib_suffix = target
     env.Append(LIBS=[f"godot-cpp.linux.{lib_suffix}.x86_64"])
 
     # 必要的编译宏
