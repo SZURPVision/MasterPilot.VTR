@@ -1,6 +1,6 @@
 #include "decoder.h"
 #include "time_analyzer.hpp"
-#include <iostream>
+#include <godot_cpp/variant/utility_functions.hpp>
 #include <cstring>
 #include <limits>
 #include <vector>
@@ -45,11 +45,11 @@ enum AVPixelFormat Decoder::get_hw_format(AVCodecContext* ctx, const enum AVPixe
     const enum AVPixelFormat* p;
     for (p = pix_fmts; *p != -1; p++) {
         if (*p == AV_PIX_FMT_VAAPI) {
-            std::cout << "[Decoder] VA-API hardware format (AV_PIX_FMT_VAAPI) selected for decoding." << std::endl;
+            godot::UtilityFunctions::print("[Decoder] VA-API hardware format (AV_PIX_FMT_VAAPI) selected for decoding.");
             return *p;
         }
     }
-    std::cerr << "[Decoder] VA-API hardware acceleration is not supported by the codec/stream. Falling back to software decoding." << std::endl;
+    godot::UtilityFunctions::printerr("[Decoder] VA-API hardware acceleration is not supported by the codec/stream. Falling back to software decoding.");
     // Return the first available software format (usually YUV420P or NV12)
     return pix_fmts[0];
 }
@@ -61,13 +61,13 @@ bool Decoder::start()
     // Initialize FFmpeg codec
     codec = avcodec_find_decoder(AV_CODEC_ID_HEVC);
     if (!codec) {
-        std::cerr << "[Decoder] Codec not found: HEVC" << std::endl;
+        godot::UtilityFunctions::printerr("[Decoder] Codec not found: HEVC");
         return false;
     }
 
     codec_ctx = avcodec_alloc_context3(codec);
     if (!codec_ctx) {
-        std::cerr << "[Decoder] Could not allocate video codec context" << std::endl;
+        godot::UtilityFunctions::printerr("[Decoder] Could not allocate video codec context");
         return false;
     }
 
@@ -81,14 +81,14 @@ bool Decoder::start()
 
     if (device_env) {
         target_device = device_env;
-        std::cout << "[Decoder] Using VA-API device from environment: " << target_device << std::endl;
+        godot::UtilityFunctions::print("[Decoder] Using VA-API device from environment: ", target_device);
     } else {
         preferred_device = find_preferred_hw_device();
         if (!preferred_device.empty()) {
             target_device = preferred_device.c_str();
-            std::cout << "[Decoder] Found preferred hardware device (Intel/AMD): " << target_device << std::endl;
+            godot::UtilityFunctions::print("[Decoder] Found preferred hardware device (Intel/AMD): ", target_device);
         } else {
-            std::cout << "[Decoder] No preferred Intel/AMD device found. Using FFmpeg auto-detection." << std::endl;
+            godot::UtilityFunctions::print("[Decoder] No preferred Intel/AMD device found. Using FFmpeg auto-detection.");
         }
     }
 
@@ -97,7 +97,7 @@ bool Decoder::start()
     if (err < 0) {
         // If specific device failed, try one last time with auto-detection
         if (target_device != NULL) {
-            std::cerr << "[Decoder] VAAPI failed on " << target_device << ", trying FFmpeg auto-detection..." << std::endl;
+            godot::UtilityFunctions::printerr("[Decoder] VAAPI failed on ", target_device, ", trying FFmpeg auto-detection...");
             err = av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
         }
     }
@@ -105,15 +105,15 @@ bool Decoder::start()
     if (err < 0) {
         char errbuf[128];
         av_strerror(err, errbuf, sizeof(errbuf));
-        std::cerr << "[Decoder] Failed to create a VAAPI device (error: " << errbuf << "). The decoder will use CPU software decoding." << std::endl;
+        godot::UtilityFunctions::printerr("[Decoder] Failed to create a VAAPI device (error: ", errbuf, "). The decoder will use CPU software decoding.");
     } else {
         codec_ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
         codec_ctx->get_format = get_hw_format;
-        std::cout << "[Decoder] VA-API hardware device context successfully created." << std::endl;
+        godot::UtilityFunctions::print("[Decoder] VA-API hardware device context successfully created.");
     }
 
     if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
-        std::cerr << "[Decoder] Could not open codec" << std::endl;
+        godot::UtilityFunctions::printerr("[Decoder] Could not open codec");
         return false;
     }
 
@@ -123,7 +123,7 @@ bool Decoder::start()
     pkt = av_packet_alloc();
 
     if (!frame || !sw_frame || !frame_rgb || !pkt) {
-        std::cerr << "[Decoder] Could not allocate frames or packet" << std::endl;
+        godot::UtilityFunctions::printerr("[Decoder] Could not allocate frames or packet");
         return false;
     }
 
@@ -198,7 +198,7 @@ void Decoder::decode_loop()
         if (data.empty()) continue; // Skip empty keep-alive packets
 
         if (data.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
-            std::cerr << "[Decoder] Packet too large: " << data.size() << std::endl;
+            godot::UtilityFunctions::push_error("[Decoder] Packet too large: ", data.size());
             continue;
         }
 
@@ -207,7 +207,7 @@ void Decoder::decode_loop()
         if (ret < 0) {
             char errbuf[64];
             av_strerror(ret, errbuf, 64);
-            std::cerr << "[Decoder] Error allocating packet: " << errbuf << std::endl;
+            godot::UtilityFunctions::push_error("[Decoder] Error allocating packet: ", errbuf);
             continue;
         }
 
@@ -217,7 +217,7 @@ void Decoder::decode_loop()
         if (ret < 0) {
             char errbuf[64];
             av_strerror(ret, errbuf, 64);
-            std::cerr << "[Decoder] Error sending packet for decoding: " << errbuf << std::endl;
+            godot::UtilityFunctions::push_error("[Decoder] Error sending packet for decoding: ", errbuf);
             continue;
         }
 
@@ -227,7 +227,7 @@ void Decoder::decode_loop()
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 break;
             } else if (ret < 0) {
-                std::cerr << "[Decoder] Error during decoding" << std::endl;
+                godot::UtilityFunctions::push_error("[Decoder] Error during decoding" );
                 break;
             }
 
@@ -247,7 +247,7 @@ void Decoder::process_frame(AVFrame* src_frame)
         av_frame_unref(sw_frame);
         int ret = av_hwframe_transfer_data(sw_frame, src_frame, 0);
         if (ret < 0) {
-            std::cerr << "[Decoder] Error transferring data from GPU to CPU" << std::endl;
+            godot::UtilityFunctions::push_error("[Decoder] Error transferring data from GPU to CPU" );
             return;
         }
         tmp_frame = sw_frame;

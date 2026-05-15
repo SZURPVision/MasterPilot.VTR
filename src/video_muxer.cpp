@@ -1,12 +1,12 @@
 #include "video_muxer.h"
 
 #include <algorithm>
-#include <cerrno>
 #include <cstddef>
 #include <cstring>
-#include <iostream>
 #include <limits>
 #include <utility>
+
+#include <godot_cpp/variant/utility_functions.hpp>
 
 namespace VTR
 {
@@ -161,7 +161,7 @@ bool VideoMuxer::open_output()
 	if (ret < 0 || format_ctx == nullptr)
 	{
 		set_last_error("Failed to allocate MPEG-TS output context.");
-		std::cerr << "[VideoMuxer] " << get_last_error() << " path=" << output_path << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str(), " path=", output_path.c_str());
 		close_output();
 		return false;
 	}
@@ -170,7 +170,7 @@ bool VideoMuxer::open_output()
 	if (stream == nullptr)
 	{
 		set_last_error("Failed to create output stream.");
-		std::cerr << "[VideoMuxer] " << get_last_error() << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str());
 		close_output();
 		return false;
 	}
@@ -189,7 +189,7 @@ bool VideoMuxer::open_output()
 			char errbuf[128];
 			av_strerror(ret, errbuf, sizeof(errbuf));
 			set_last_error(std::string{"Failed to open output file: "} + errbuf);
-			std::cerr << "[VideoMuxer] " << get_last_error() << std::endl;
+			godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str());
 			close_output();
 			return false;
 		}
@@ -201,7 +201,7 @@ bool VideoMuxer::open_output()
 		char errbuf[128];
 		av_strerror(ret, errbuf, sizeof(errbuf));
 		set_last_error(std::string{"Failed to write MPEG-TS header: "} + errbuf);
-		std::cerr << "[VideoMuxer] " << get_last_error() << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str());
 		close_output();
 		return false;
 	}
@@ -211,7 +211,7 @@ bool VideoMuxer::open_output()
 	if (packet == nullptr)
 	{
 		set_last_error("Failed to allocate AVPacket.");
-		std::cerr << "[VideoMuxer] " << get_last_error() << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str());
 		close_output();
 		return false;
 	}
@@ -259,7 +259,7 @@ bool VideoMuxer::write_sample(const PendingSample& sample, int64_t duration_usec
 	if (sample.data.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
 	{
 		set_last_error("Access unit too large.");
-		std::cerr << "[VideoMuxer] " << get_last_error() << " size=" << sample.data.size() << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str(), " size=", sample.data.size() );
 		return false;
 	}
 
@@ -270,7 +270,7 @@ bool VideoMuxer::write_sample(const PendingSample& sample, int64_t duration_usec
 		char errbuf[128];
 		av_strerror(ret, errbuf, sizeof(errbuf));
 		set_last_error(std::string{"Failed to allocate packet: "} + errbuf);
-		std::cerr << "[VideoMuxer] " << get_last_error() << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str());
 		return false;
 	}
 
@@ -290,7 +290,7 @@ bool VideoMuxer::write_sample(const PendingSample& sample, int64_t duration_usec
 		char errbuf[128];
 		av_strerror(ret, errbuf, sizeof(errbuf));
 		set_last_error(std::string{"Failed to write frame: "} + errbuf);
-		std::cerr << "[VideoMuxer] " << get_last_error() << std::endl;
+		godot::UtilityFunctions::push_error("[VideoMuxer] ", get_last_error().c_str());
 		return false;
 	}
 

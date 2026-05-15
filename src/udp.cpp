@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <vector>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace VTR;
 
@@ -30,7 +31,7 @@ bool UDP::start(int port)
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0)
 	{
-		std::cerr << "[UDP] Failed to create socket" << std::endl;
+		godot::UtilityFunctions::push_error("[UDP] Failed to create socket");
 		return false;
 	}
 
@@ -43,7 +44,7 @@ bool UDP::start(int port)
 	int n_ret = bind(fd, (const sockaddr *)&servaddr, sizeof(servaddr));
 	if (n_ret < 0)
 	{
-		std::cerr << "[UDP] Failed to bind, ret=" << n_ret << std::endl;
+		godot::UtilityFunctions::push_error("[UDP] Failed to bind, ret=", n_ret);
 		close(fd);
 		return false;
 	}
@@ -51,7 +52,7 @@ bool UDP::start(int port)
 	const int flags = fcntl(fd, F_GETFL, 0);
 	if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
 	{
-		std::cerr << "[UDP] Failed to set socket non-blocking" << std::endl;
+		godot::UtilityFunctions::push_error("[UDP] Failed to set socket non-blocking");
 		close(fd);
 		return false;
 	}
@@ -59,7 +60,7 @@ bool UDP::start(int port)
 	sockfd = fd;
 	running = true;
 	recv_worker = std::thread(&UDP::recv_loop, this);
-	std::cout << "[UDP] UDP started" << std::endl;
+	godot::UtilityFunctions::print("[UDP] UDP started");
 	return true;
 }
 void UDP::stop()

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 #include <format>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 template <bool Enable>
 class TimeAnalyzerImpl {
@@ -23,7 +24,7 @@ public:
     ~TimeAnalyzerImpl() {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        std::cout << std::format("[Timer] {} : {} us", name, duration) << std::endl;
+		godot::UtilityFunctions::print("[Timer] ", name.c_str()," : ",duration);
     }
 };
 

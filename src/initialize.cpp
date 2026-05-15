@@ -2,19 +2,19 @@
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
-#include <iostream>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 
 void initialize_vtr_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
-	std::cout<<"[VTR]Registering ClassDB"<< std::endl;
+    UtilityFunctions::print("[VTR] Registering ClassDB");
     ClassDB::register_class<VTRControl>();
 }
 
 void uninitialize_vtr_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
-	std::cout<<"[VTR]Unregistering Module"<< std::endl;
+    UtilityFunctions::print("[VTR] Unregistering Module");
 }
 
 extern "C" {
