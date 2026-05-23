@@ -57,7 +57,7 @@ env.ParseConfig("pkg-config --cflags --libs libavcodec libavformat libavutil lib
 
 # --- 源码与目标 ---
 sources = Glob("src/*.cpp")
-target_name = "addons/vtr_texture/bin/vtrtexture{}{}".format(
+target_name = "addons/vtr/bin/vtr{}{}".format(
     env["suffix"], env["SHLIBSUFFIX"] # type: ignore
 )
 

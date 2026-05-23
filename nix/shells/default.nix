@@ -32,18 +32,7 @@
         GEN_GODOT_CPP_DB = "0";
         
         shellHook = ''
-          echo "VTR Minimal Environment"
-          
-          # 优先使用本地 godot-cpp 目录
-          if [ -d "./godot-cpp" ]; then
-            export GODOT_CPP_PATH="./godot-cpp"
-            echo "Using local godot-cpp submodule."
-          else
-            echo "Warning: No local godot-cpp directory found."
-            echo "If you want to use the Nix-provided one, note that it's READ-ONLY."
-            echo "Suggested: git submodule update --init"
-            export GODOT_CPP_PATH="${self'.packages.godot-cpp}"
-          fi
+	  export GODOT_CPP_PATH="${self'.packages.godot-cpp}"
         '';
       };
 
@@ -59,14 +48,6 @@
         shellHook = old.shellHook + ''
           echo "LSP (clangd) support enabled"
           ${updateDB}
-        '';
-      });
-
-      # 3. 完整环境
-      rm-mock = self'.devShells.default.overrideAttrs (old: {
-        nativeBuildInputs = old.nativeBuildInputs ++ [ self'.packages.rmmock ];
-        shellHook = old.shellHook + ''
-          echo "RM-Mock integration enabled"
         '';
       });
     };
