@@ -9,4 +9,4 @@ extension_api.json
 .godot_bin
 dump
 .direnv
-./result
+result

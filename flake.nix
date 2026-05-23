@@ -17,6 +17,7 @@
       imports = [
         ./nix/pkgs
         ./nix/shells
+        ./nix/apps
       ];
     };
 }
