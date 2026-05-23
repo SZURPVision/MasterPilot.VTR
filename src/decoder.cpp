@@ -1,32 +1,30 @@
 #include "decoder.h"
 #include "time_analyzer.hpp"
 #include <godot_cpp/variant/utility_functions.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <cstring>
 #include <limits>
 #include <vector>
-#include <fstream>
 #include <string>
-#include <filesystem>
 
 namespace VTR
 {
 
 // Helper to find preferred VAAPI device (Intel: 0x8086, AMD: 0x1002)
+// Use Godot's FileAccess to avoid libstdc++ locale ABI issues
 static std::string find_preferred_hw_device() {
     for (int i = 128; i < 135; ++i) {
-        std::string base = "renderD" + std::to_string(i);
-        std::filesystem::path device_path = "/dev/dri/" + base;
-        std::filesystem::path vendor_path = "/sys/class/drm/" + base + "/device/vendor";
+        godot::String base = "renderD" + godot::String::num_int64(i);
+        godot::String vendor_path = "/sys/class/drm/" + base + "/device/vendor";
 
-        if (std::filesystem::exists(vendor_path)) {
-            std::ifstream ifs(vendor_path.string());
-            if (ifs.is_open()) {
-                std::string vendor;
-                ifs >> vendor;
+        if (godot::FileAccess::file_exists(vendor_path)) {
+            godot::Ref<godot::FileAccess> f = godot::FileAccess::open(vendor_path, godot::FileAccess::READ);
+            if (f.is_valid()) {
+                godot::String vendor = f->get_line().strip_edges();
                 // Intel (0x8086) or AMD (0x1002)
-                if (vendor.find("0x8086") != std::string::npos || 
-                    vendor.find("0x1002") != std::string::npos) {
-                    return device_path.string();
+                if (vendor.contains("0x8086") || vendor.contains("0x1002")) {
+                    godot::String device_path = "/dev/dri/" + base;
+                    return std::string(device_path.utf8().get_data());
                 }
             }
         }
