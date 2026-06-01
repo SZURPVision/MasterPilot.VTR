@@ -5,7 +5,9 @@
     name = "install";
     runtimeInputs = [ pkgs.coreutils ];
     text = ''
-      ln -sf ${vtr + /addons}/* ./example/addons/
+      addons_path="./example/addons"
+      mkdir -p $addons_path
+      ln -sf ${vtr + /addons}/* $addons_path/
     '';
   };
   meta = {

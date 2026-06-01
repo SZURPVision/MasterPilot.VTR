@@ -1,6 +1,6 @@
 CompileFlags:
   CompilationDatabase: "."
-  Compiler: "/nix/store/hb2bs5fg5wkm04x565737qd5nh2hy5nk-gcc-wrapper-15.2.0/bin/g++"
+  Compiler: "g++"
   
   Add: [
     "-I./godot-cpp/include",
@@ -10,23 +10,10 @@ CompileFlags:
     "-DGDEXTENSION",
     "-DLINUX_ENABLED",
     "-DDEBUG_ENABLED",
-    "-isystem",
-    "/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/include/c++/15.2.0",
-    "-isystem",
-    "/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/include/c++/15.2.0/x86_64-unknown-linux-gnu",
-    "-isystem",
-    "/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/include/c++/15.2.0/backward",
-    "-isystem",
-    "/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/lib/gcc/x86_64-unknown-linux-gnu/15.2.0/include",
-    "-isystem",
-    "/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/include",
-    "-isystem",
-    "/nix/store/lvwga6ivl1d4lnw0zis9ajs0rqx9gp4i-gcc-15.2.0/lib/gcc/x86_64-unknown-linux-gnu/15.2.0/include-fixed",
-    "-isystem",
-    "/nix/store/h0ip0h6qp7kc2wm7mwjaglkxxbzmjri4-glibc-2.42-51-dev/include"
+    "-isystem"
   ]
   
-  Remove: [-fno-gnu-unique, -fstack-usage, -m*]
+  Remove: [ "-fno-gnu-unique", "-fstack-usage", "-m*" ]
 
 Index:
   Background: Build

@@ -4,7 +4,7 @@
 **注意: 本模块仅支持 Linux 环境**
 
 ## 使用方法
-- 编译项目，添加到 addons (参考 example 文件夹)
+- 将nix构建产物放在addons里
 - 在场景中添加 `VTRControl` 节点
 - 设置 `port` 属性 (默认 5000)
 - 将 `active` 设为 `true`
@@ -30,14 +30,8 @@ Decoder --"解码并回调"-->VTRControl
 
 ### 1. 进入开发环境
 ```sh
-# 默认环境 (包含 SCons, FFmpeg, Godot 4.6, 以及 clangd)
 nix develop
-
-# 最小环境 (仅包含编译工具，不含 clangd)
-nix develop .#minimal
-
-# 全能环境 (默认环境 + RM-Mock 工具)
-nix develop .#rm-mock
+code .
 ```
 
 ### 2. 配置 IDE (clangd)
@@ -49,12 +43,6 @@ nix develop .#rm-mock
 如果需要手动触发更新：
 ```sh
 scons compile_commands.json
-```
-
-### 3. 辅助工具
-如果需要进入传统的 FHS 环境（模拟标准 Linux 目录结构）：
-```sh
-nix run .#fhsEnv
 ```
 
 ## 开发与编译
@@ -71,7 +59,7 @@ nix build .#vtr-debug
 nix build .#vtr-release
 
 # 编译并将结果放到example项目下
-nix run .#example-install
+nix run .#install
 ```
 
 **SCons 手动构建**:
@@ -81,6 +69,14 @@ scons platform=linux target=template_debug dev_build=yes
 ```
 
 ### 调试
+使用`RMMock`来发包测试.
+
+该软件构建时需要连接`google`, 注意网络环境
+
+```bash
+nix run github:vixhentx/RMMock
+```
+
 - 确保 launch 选中 `Attach GDExtension (Linux)`
 - Godot 启动要调试的场景
 - 启动调试 (F5)，输入 godot，找启动命令里面带 `.tscn` 的进程
@@ -89,4 +85,3 @@ scons platform=linux target=template_debug dev_build=yes
 - **增量构建**: `nix build` 虽为全量，但已通过 **Source Filter** 和 **SDK Mode** 极大优化。修改非源码文件不再触发重跑，且不再重复扫描 `godot-cpp`，构建速度接近增量。
 - **本地安装**: 使用 `nix run .#install` 可以将 Nix 沙盒编译出的只读产物安全地同步到本地 `./addons` 目录，方便 Godot 识别。
 - **Godot-CPP**: 已由 Nix 自动管理并注入 `GODOT_CPP_PATH`，无需手动克隆 submodule。
-- **Mock 环境**: 通过 `nix develop .#rm-mock` 开启。
