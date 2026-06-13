@@ -6,6 +6,9 @@
 #include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <vector>
 
 // Include subsystem headers
 #include "udp.h"
@@ -33,6 +36,8 @@ public:
     bool is_recording() const;
     String get_last_recording_error() const;
 
+    Ref<Image> capture_screenshot();
+
 protected:
     static void _bind_methods();
     void _notification(int p_what);
@@ -52,6 +57,14 @@ private:
     int32_t current_width = 0;
     int32_t current_height = 0;
     std::atomic<bool> tearing_down{false};
+
+    // Screenshot (calibration / on-demand capture)
+    std::atomic<bool> _capture_requested{false};
+    std::mutex _capture_mutex;
+    std::condition_variable _capture_cv;
+    std::vector<uint8_t> _capture_buffer;
+    int _capture_width = 0;
+    int _capture_height = 0;
 
     Ref<ImageTexture> internal_texture;
     Ref<ShaderMaterial> internal_material;

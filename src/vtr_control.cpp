@@ -245,6 +245,19 @@ void VTRControl::_on_decoder_frame(const uint8_t* y_data, const uint8_t* uv_data
     for (int i = 0; i < p_height / 2; ++i) {
         memcpy(uv_dst + i * p_width, uv_data + i * uv_stride, p_width);
     }
+
+    // Screenshot capture: only do the copy when explicitly requested
+    if (_capture_requested.load(std::memory_order_acquire)) {
+        {
+            std::lock_guard<std::mutex> lk(_capture_mutex);
+            _capture_buffer.resize(size);
+            memcpy(_capture_buffer.data(), dst, size);
+            _capture_width = p_width;
+            _capture_height = p_height;
+            _capture_requested.store(false, std::memory_order_release);
+        }
+        _capture_cv.notify_one();
+    }
     
     call_deferred("_update_texture_on_main_thread", pba, p_width, p_height);
 }
@@ -272,6 +285,31 @@ void VTRControl::_update_texture_on_main_thread(const PackedByteArray& p_data, i
     }
 }
 
+Ref<Image> VTRControl::capture_screenshot() {
+    if (Engine::get_singleton()->is_editor_hint()) {
+        return Ref<Image>();
+    }
+
+    _capture_requested.store(true, std::memory_order_release);
+
+    std::unique_lock<std::mutex> lk(_capture_mutex);
+    _capture_cv.wait(lk, [this] {
+        return !_capture_requested.load(std::memory_order_acquire);
+    });
+
+    if (_capture_buffer.empty()) {
+        return Ref<Image>();
+    }
+
+    int packed_height = _capture_height + _capture_height / 2;
+    PackedByteArray pba;
+    pba.resize(_capture_buffer.size());
+    memcpy(pba.ptrw(), _capture_buffer.data(), _capture_buffer.size());
+
+    Ref<Image> img = Image::create_from_data(_capture_width, packed_height, false, Image::FORMAT_L8, pba);
+    return img;
+}
+
 void VTRControl::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_port"), &VTRControl::get_port);
     ClassDB::bind_method(D_METHOD("set_port", "p_port"), &VTRControl::set_port);
@@ -287,4 +325,6 @@ void VTRControl::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_last_recording_error"), &VTRControl::get_last_recording_error);
 
     ClassDB::bind_method(D_METHOD("_update_texture_on_main_thread", "data", "width", "height"), &VTRControl::_update_texture_on_main_thread);
+
+    ClassDB::bind_method(D_METHOD("capture_screenshot"), &VTRControl::capture_screenshot);
 }
