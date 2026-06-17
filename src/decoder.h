@@ -2,9 +2,12 @@
 
 #include "safe_queue.hpp"
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
 #include <functional>
-#include <thread>
 #include <mutex>
+#include <thread>
+#include <vector>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -25,6 +28,10 @@ public:
     bool start();
     void stop();
     void set_on_frame_decoded(FrameCallback cb);
+
+    // Screenshot: on-demand NV12→RGB24 conversion on decoder thread
+    void request_screenshot();
+    bool wait_screenshot(int timeout_ms, std::vector<uint8_t>& out_rgb, int& out_w, int& out_h);
 private:
     Que& input_queue;
     std::atomic<bool> running{false};
@@ -48,6 +55,18 @@ private:
     uint8_t* rgb_buffer = nullptr;
     int current_width = 0;
     int current_height = 0;
+
+    // Screenshot infrastructure (on-demand only)
+    std::atomic<bool> screenshot_requested{false};
+    std::mutex screenshot_mtx;
+    std::condition_variable screenshot_cv;
+    std::vector<uint8_t> screenshot_rgb;
+    int screenshot_w = 0;
+    int screenshot_h = 0;
+    bool screenshot_ready = false;
+
+    SwsContext* sws_rgb = nullptr;
+    AVFrame* frame_rgb_out = nullptr;
 
     void decode_loop();
     void cleanup();

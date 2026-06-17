@@ -181,6 +181,14 @@ void Decoder::cleanup()
         av_free(rgb_buffer);
         rgb_buffer = nullptr;
     }
+    if (sws_rgb) {
+        sws_freeContext(sws_rgb);
+        sws_rgb = nullptr;
+    }
+    if (frame_rgb_out) {
+        av_frame_free(&frame_rgb_out);
+        frame_rgb_out = nullptr;
+    }
 }
 
 void Decoder::decode_loop()
@@ -291,6 +299,86 @@ void Decoder::process_frame(AVFrame* src_frame)
             tmp_frame->linesize[1]
         );
     }
+
+    // Screenshot: on-demand NV12→RGB24 conversion
+    if (screenshot_requested.load(std::memory_order_acquire)) {
+        {
+            std::lock_guard<std::mutex> lk(screenshot_mtx);
+            screenshot_w = current_width;
+            screenshot_h = current_height;
+
+            // Setup sws context for NV12→RGB24 if needed
+            sws_rgb = sws_getCachedContext(sws_rgb,
+                current_width, current_height, AV_PIX_FMT_NV12,
+                current_width, current_height, AV_PIX_FMT_RGB24,
+                SWS_POINT, nullptr, nullptr, nullptr);
+
+            if (sws_rgb) {
+                // Lazy-alloc or realloc frame_rgb_out
+                if (!frame_rgb_out) {
+                    frame_rgb_out = av_frame_alloc();
+                }
+                if (frame_rgb_out) {
+                    if (frame_rgb_out->format != AV_PIX_FMT_RGB24 ||
+                        frame_rgb_out->width != current_width ||
+                        frame_rgb_out->height != current_height) {
+                        av_frame_unref(frame_rgb_out);
+                        frame_rgb_out->format = AV_PIX_FMT_RGB24;
+                        frame_rgb_out->width = current_width;
+                        frame_rgb_out->height = current_height;
+                        if (av_frame_get_buffer(frame_rgb_out, 0) < 0) {
+                            screenshot_ready = true;
+                            screenshot_requested.store(false, std::memory_order_release);
+                            screenshot_cv.notify_one();
+                            return;
+                        }
+                    }
+                    sws_scale(sws_rgb,
+                        tmp_frame->data, tmp_frame->linesize, 0, current_height,
+                        frame_rgb_out->data, frame_rgb_out->linesize);
+
+                    // Pack into contiguous RGB24 buffer
+                    int rgb_size = current_width * current_height * 3;
+                    screenshot_rgb.resize(rgb_size);
+                    uint8_t* dst = screenshot_rgb.data();
+                    for (int y = 0; y < current_height; ++y) {
+                        memcpy(dst + y * current_width * 3,
+                               frame_rgb_out->data[0] + y * frame_rgb_out->linesize[0],
+                               current_width * 3);
+                    }
+                }
+            }
+
+            screenshot_ready = true;
+            screenshot_requested.store(false, std::memory_order_release);
+        }
+        screenshot_cv.notify_one();
+    }
+}
+
+void Decoder::request_screenshot()
+{
+    screenshot_ready = false;
+    screenshot_requested.store(true, std::memory_order_release);
+}
+
+bool Decoder::wait_screenshot(int timeout_ms, std::vector<uint8_t>& out_rgb, int& out_w, int& out_h)
+{
+    std::unique_lock<std::mutex> lk(screenshot_mtx);
+    bool completed = screenshot_cv.wait_for(lk, std::chrono::milliseconds(timeout_ms), [this] {
+        return screenshot_ready;
+    });
+
+    if (!completed || screenshot_rgb.empty()) {
+        screenshot_requested.store(false, std::memory_order_release);
+        return false;
+    }
+
+    out_rgb = std::move(screenshot_rgb);
+    out_w = screenshot_w;
+    out_h = screenshot_h;
+    screenshot_ready = false;
+    return true;
 }
 
 }

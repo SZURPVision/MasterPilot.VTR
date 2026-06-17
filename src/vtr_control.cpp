@@ -246,19 +246,6 @@ void VTRControl::_on_decoder_frame(const uint8_t* y_data, const uint8_t* uv_data
         memcpy(uv_dst + i * p_width, uv_data + i * uv_stride, p_width);
     }
 
-    // Screenshot capture: only do the copy when explicitly requested
-    if (_capture_requested.load(std::memory_order_acquire)) {
-        {
-            std::lock_guard<std::mutex> lk(_capture_mutex);
-            _capture_buffer.resize(size);
-            memcpy(_capture_buffer.data(), dst, size);
-            _capture_width = p_width;
-            _capture_height = p_height;
-            _capture_requested.store(false, std::memory_order_release);
-        }
-        _capture_cv.notify_one();
-    }
-    
     call_deferred("_update_texture_on_main_thread", pba, p_width, p_height);
 }
 
@@ -290,23 +277,19 @@ Ref<Image> VTRControl::capture_screenshot() {
         return Ref<Image>();
     }
 
-    _capture_requested.store(true, std::memory_order_release);
+    decoder.request_screenshot();
 
-    std::unique_lock<std::mutex> lk(_capture_mutex);
-    _capture_cv.wait(lk, [this] {
-        return !_capture_requested.load(std::memory_order_acquire);
-    });
-
-    if (_capture_buffer.empty()) {
+    std::vector<uint8_t> rgb_data;
+    int w = 0, h = 0;
+    if (!decoder.wait_screenshot(500, rgb_data, w, h) || rgb_data.empty()) {
         return Ref<Image>();
     }
 
-    int packed_height = _capture_height + _capture_height / 2;
     PackedByteArray pba;
-    pba.resize(_capture_buffer.size());
-    memcpy(pba.ptrw(), _capture_buffer.data(), _capture_buffer.size());
+    pba.resize(rgb_data.size());
+    memcpy(pba.ptrw(), rgb_data.data(), rgb_data.size());
 
-    Ref<Image> img = Image::create_from_data(_capture_width, packed_height, false, Image::FORMAT_L8, pba);
+    Ref<Image> img = Image::create_from_data(w, h, false, Image::FORMAT_RGB8, pba);
     return img;
 }
 
