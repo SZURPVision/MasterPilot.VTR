@@ -1,8 +1,6 @@
 #pragma once
-#include <iostream>
 #include <chrono>
 #include <string>
-#include <format>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 template <bool Enable>

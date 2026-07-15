@@ -3,8 +3,6 @@
 #include "time_analyzer.hpp"
 #include <cstdint>
 #include <cerrno>
-#include <iostream>
-#include <ostream>
 #include <poll.h>
 #include <sys/types.h>
 #include <thread>

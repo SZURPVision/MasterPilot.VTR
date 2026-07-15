@@ -1,9 +1,6 @@
 #pragma once
 
 #include <concepts>
-#include <cstdint>
-#include <fstream>
-#include <string>
 
 namespace VTR
 {
@@ -20,14 +17,15 @@ namespace VTR
         return static_cast<SignedT>(a - b) > 0;
     }
 
-    // 保存hevc裸流. 用于debug, 后续可以改造成录屏工具
-    inline void dump_frame(const std::span<uint8_t> &frame_data, const std::string& file_path)
-    {
-        static std::ofstream dump_file(file_path, std::ios::binary | std::ios::out);
-        if (dump_file.is_open())
-        {
-            dump_file.write(reinterpret_cast<const char *>(frame_data.data()), frame_data.size());
-            dump_file.flush();
-        }
-    }
+	// 暂时移除, 拔掉所有iostream符号
+    // // 保存hevc裸流. 用于debug, 后续可以改造成录屏工具
+    // inline void dump_frame(const std::span<uint8_t> &frame_data, const std::string& file_path)
+    // {
+    //     static std::ofstream dump_file(file_path, std::ios::binary | std::ios::out);
+    //     if (dump_file.is_open())
+    //     {
+    //         dump_file.write(reinterpret_cast<const char *>(frame_data.data()), frame_data.size());
+    //         dump_file.flush();
+    //     }
+    // }
 }
