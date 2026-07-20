@@ -54,6 +54,7 @@ private:
     int32_t current_width = 0;
     int32_t current_height = 0;
     std::atomic<bool> tearing_down{false};
+    int lock_fd = -1;
 
     Ref<ImageTexture> internal_texture;
     Ref<ShaderMaterial> internal_material;

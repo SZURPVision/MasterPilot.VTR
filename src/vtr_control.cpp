@@ -7,6 +7,8 @@
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <cstring>
+#include <fcntl.h>
+#include <sys/file.h>
 
 using namespace godot;
 
@@ -197,6 +199,12 @@ void VTRControl::_stop_runtime(bool p_is_teardown) {
     active = false;
     udp.stop();
     decoder.stop();
+
+    if (lock_fd >= 0) {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        lock_fd = -1;
+    }
 }
 
 void VTRControl::_sync_state() {
@@ -207,13 +215,28 @@ void VTRControl::_sync_state() {
             return;
         }
 
+        // Acquire exclusive file lock to prevent multiple instances on the same port.
+        // The kernel releases this lock automatically when the process exits (even on crash).
+        String lock_path = vformat("/tmp/vtr_port_%d.lock", port);
+        lock_fd = open(lock_path.utf8().get_data(), O_CREAT | O_RDWR, 0644);
+        if (lock_fd < 0 || flock(lock_fd, LOCK_EX | LOCK_NB) != 0) {
+            if (lock_fd >= 0) {
+                close(lock_fd);
+                lock_fd = -1;
+            }
+            UtilityFunctions::printerr(vformat(
+                "[VTRControl] Port %d is busy or another instance is running. Exiting.", port));
+            _stop_runtime(false);
+            _exit(1);
+        }
+
         bool udp_started = udp.start(port);
         bool dec_started = decoder.start();
         
         if (!udp_started || !dec_started) {
-            UtilityFunctions::printerr("[VTRControl] Failed to start components.");
-            active = false;
+            UtilityFunctions::printerr("[VTRControl] Failed to start components, exiting process.");
             _stop_runtime(false);
+            _exit(1);
         }
         
         // Reset timestamp on start
