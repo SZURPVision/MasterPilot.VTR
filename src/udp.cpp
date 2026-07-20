@@ -39,6 +39,9 @@ bool UDP::start(int port)
 		.sin_addr{INADDR_ANY}, // 所有网卡接口
 	};
 
+	int opt = 1;
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
 	int n_ret = bind(fd, (const sockaddr *)&servaddr, sizeof(servaddr));
 	if (n_ret < 0)
 	{
